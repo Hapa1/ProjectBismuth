@@ -4,7 +4,7 @@ import {
   createRootRoute,
 } from '@tanstack/react-router';
 import { AppShell } from './AppShell';
-import { LandingView } from './views/LandingView';
+import { SlideshowView } from './views/SlideshowView';
 import { ProjectView } from './views/ProjectView';
 import { NotFoundView } from './views/NotFoundView';
 
@@ -13,7 +13,7 @@ const rootRoute = createRootRoute({ component: AppShell });
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
-  component: LandingView,
+  component: SlideshowView,
 });
 
 const projectRoute = createRoute({

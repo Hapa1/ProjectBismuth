@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
@@ -10,7 +10,9 @@ import {
   IridescentSolid,
   useIridescentMaterial,
   useAudioUniforms,
+  useBleedDriver,
   usePrefersReducedMotion,
+  type BleedEffect,
   type IridescentPaletteMode,
   type IridescentSolidKind,
 } from '../../lib/iridescent';
@@ -28,19 +30,21 @@ interface Controls {
   spinBase: number;
   bloomIntensity: number;
   palette: IridescentPaletteMode;
+  bleedEffect: BleedEffect;
   seed: number;
 }
 
 const DEFAULTS: Controls = {
   audioGain: 0.95,
-  smoothing: 0.82,
-  reactivity: 0.45,
+  smoothing: 0.88,
+  reactivity: 0.25,
   avgOrbitCount: 5,
   ringRadius: 1.7,
   childScale: 0.5,
-  spinBase: 0.28,
-  bloomIntensity: 0.45,
-  palette: 'cosine',
+  spinBase: 0.18,
+  bloomIntensity: 0.7,
+  palette: 'bleed',
+  bleedEffect: 'rings',
   seed: 137,
 };
 
@@ -63,6 +67,37 @@ function hashInt(seed: number, loInclusive: number, hiInclusive: number): number
 const KINDS: IridescentSolidKind[] = ['tetra', 'box', 'octa', 'icosa', 'prism'];
 
 // ---------------------------------------------------------------------------
+// RegisteredCrystal—IridescentSolid that registers its mesh on mount so the
+// bleed driver can read live world positions when spawning per-crystal pulses.
+// ---------------------------------------------------------------------------
+type RegisterCrystal = (mesh: THREE.Mesh) => () => void;
+
+interface RegisteredCrystalProps {
+  register: RegisterCrystal | null;
+  kind: IridescentSolidKind;
+  size: number;
+  material: THREE.ShaderMaterial;
+  rotation?: [number, number, number];
+}
+
+function RegisteredCrystal({ register, kind, size, material, rotation }: RegisteredCrystalProps) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  useEffect(() => {
+    if (!register || !meshRef.current) return;
+    return register(meshRef.current);
+  }, [register]);
+  return (
+    <IridescentSolid
+      kind={kind}
+      size={size}
+      material={material}
+      rotation={rotation}
+      meshRef={meshRef}
+    />
+  );
+}
+
+// ---------------------------------------------------------------------------
 // FractalNode — orbiting iridescent crystals
 // ---------------------------------------------------------------------------
 interface NodeProps {
@@ -80,6 +115,8 @@ interface NodeProps {
   spinSign: number;
   /** Seed used to derive deterministic per-node variation. */
   seed: number;
+  /** Mount/unmount registrar so the bleed driver can read live crystal positions. */
+  register: RegisterCrystal | null;
 }
 
 function FractalNode({
@@ -95,6 +132,7 @@ function FractalNode({
   reduceMotion,
   spinSign,
   seed,
+  register,
 }: NodeProps) {
   const groupRef = useRef<THREE.Group>(null);
 
@@ -137,7 +175,8 @@ function FractalNode({
   // Leaf — single crystal, no children.
   if (level >= maxDepth) {
     return (
-      <IridescentSolid
+      <RegisteredCrystal
+        register={register}
         kind={variation.centerKind}
         size={variation.centerSize * 0.9}
         material={material}
@@ -149,7 +188,8 @@ function FractalNode({
   return (
     <group ref={groupRef}>
       {/* Central crystal */}
-      <IridescentSolid
+      <RegisteredCrystal
+        register={register}
         kind={variation.centerKind}
         size={variation.centerSize}
         material={material}
@@ -183,6 +223,7 @@ function FractalNode({
                 reduceMotion={reduceMotion}
                 spinSign={-spinSign}
                 seed={c.seed}
+                register={register}
               />
             </group>
           );
@@ -205,24 +246,52 @@ interface SceneProps {
 function Scene({ bandsRef, controls, reduceMotion, maxDepth }: SceneProps) {
   const material = useIridescentMaterial({
     palette: controls.palette,
-    intensity: 0.85,
+    intensity: controls.palette === 'bleed' ? 2.1 : 0.85,
     fresnelPower: 2.6,
     rimBoost: 1.4,
     innerWash: 0.28,
     alphaBase: 0.04,
   });
 
-  // Audio drives uTime + uMirage + uLevel + uTreble on the shared material.
-  // Softened envelope params keep beats from spiking the brightness.
+  // Live mesh refs of every crystal in the scene; the bleed driver pulls a
+  // random one for per-crystal pulse spawning. Stable identity so child
+  // mounts/unmounts don't churn upstream effects.
+  const crystalRefs = useRef<THREE.Object3D[]>([]);
+  const register = useCallback<RegisterCrystal>((mesh) => {
+    crystalRefs.current.push(mesh);
+    return () => {
+      const i = crystalRefs.current.indexOf(mesh);
+      if (i >= 0) crystalRefs.current.splice(i, 1);
+    };
+  }, []);
+
+  // Cosine / colorField driver — paused (no uTime advance) when bleed is active.
   useAudioUniforms(material, {
     bandsRef,
     reactivity: controls.reactivity,
-    pause: reduceMotion,
+    pause: reduceMotion || controls.palette === 'bleed',
     timeScale: 1.0,
     mirageFloor: 0.55,
     mirageCeiling: 0.95,
     mirageBase: 0.6,
     mirageGain: 0.9,
+  });
+
+  // Bleed driver — paused when not in bleed mode (writes to bleed-only uniforms
+  // which other modes ignore, so leaving it active is harmless but wasteful).
+  // Slower pulse travel + longer lifetime + lighter decay = calmer cadence.
+  useBleedDriver(material, {
+    bandsRef,
+    crystalRefs,
+    reactivity: controls.reactivity * 0.7,
+    effect: controls.bleedEffect,
+    pause: reduceMotion || controls.palette !== 'bleed',
+    randomSpawnChance: 0.5,
+    randomSpawnRadius: Math.max(controls.ringRadius * 1.4, 2.0),
+    pulseTravel: Math.max(controls.ringRadius * 2.4, 3.5),
+    pointerRadius: Math.max(controls.ringRadius * 1.8, 3.0),
+    pulseDecay: 0.45,
+    beat: { threshold: 1.85, refractory: 0.32, heartbeatGap: 1.8 },
   });
 
   // Treble drives a global hue shift uniform written here so audio influences
@@ -248,6 +317,7 @@ function Scene({ bandsRef, controls, reduceMotion, maxDepth }: SceneProps) {
       reduceMotion={reduceMotion}
       spinSign={1}
       seed={controls.seed}
+      register={register}
     />
   );
 }
@@ -437,6 +507,13 @@ function Prismata({ width, height }: ProjectComponentProps) {
           <div className={styles.audioGrid}>
             <button
               type="button"
+              className={`${styles.button} ${controls.palette === 'bleed' ? styles.buttonActive : ''}`}
+              onClick={() => setControls((c) => ({ ...c, palette: 'bleed' }))}
+            >
+              Bleed
+            </button>
+            <button
+              type="button"
               className={`${styles.button} ${controls.palette === 'cosine' ? styles.buttonActive : ''}`}
               onClick={() => setControls((c) => ({ ...c, palette: 'cosine' }))}
             >
@@ -450,6 +527,20 @@ function Prismata({ width, height }: ProjectComponentProps) {
               Color Field
             </button>
           </div>
+          {controls.palette === 'bleed' && (
+            <div className={styles.audioGrid} style={{ marginTop: '0.5rem' }}>
+              {(['rings', 'bloom', 'streaks', 'sparkle'] as const).map((fx) => (
+                <button
+                  key={fx}
+                  type="button"
+                  className={`${styles.button} ${controls.bleedEffect === fx ? styles.buttonActive : ''}`}
+                  onClick={() => setControls((c) => ({ ...c, bleedEffect: fx }))}
+                >
+                  {fx[0].toUpperCase() + fx.slice(1)}
+                </button>
+              ))}
+            </div>
+          )}
         </section>
 
         <section className={styles.section}>

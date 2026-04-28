@@ -1,0 +1,386 @@
+.root {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg, #0a0a0a);
+  padding: clamp(0.75rem, 2vw, 1.25rem);
+  padding-top: clamp(3.5rem, 8vh, 4.5rem);
+  gap: clamp(0.6rem, 1.5vw, 1rem);
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  text-align: center;
+  flex: 0 0 auto;
+}
+
+.eyebrow {
+  font-family: var(--font-mono, ui-monospace);
+  font-size: clamp(0.625rem, 0.55rem + 0.2vw, 0.75rem);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(170, 170, 180, 0.85);
+}
+
+.title {
+  font-family: var(--font-mono, ui-monospace);
+  font-size: clamp(1.05rem, 0.9rem + 1vw, 1.6rem);
+  line-height: 1.3;
+  margin: 0;
+  color: var(--color-text, #e5e5e5);
+}
+
+/* MOBILE: rail becomes a horizontal strip on top, detail below. */
+.layout {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: auto 1fr;
+  gap: clamp(0.6rem, 1.5vw, 1rem);
+  min-height: 0;
+}
+
+/* Rail */
+.rail {
+  min-height: 0;
+}
+.railList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.5rem;
+  overflow-x: auto;
+}
+
+.railItem {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
+  width: 100%;
+  min-height: 44px;
+  padding: 0.35rem;
+  border-radius: 0.6rem;
+  border: 1px solid rgba(167, 139, 250, 0.18);
+  background: rgba(20, 14, 40, 0.55);
+  color: #ece4ff;
+  font-family: var(--font-mono, ui-monospace);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 120ms ease, background 120ms ease, transform 120ms ease;
+}
+
+.railItem:focus-visible {
+  outline: 2px solid var(--color-focus-ring, #a78bfa);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .railItem:hover {
+    background: rgba(167, 139, 250, 0.12);
+    border-color: rgba(167, 139, 250, 0.35);
+  }
+}
+
+.railItemActive {
+  background: rgba(167, 139, 250, 0.22) !important;
+  border-color: rgba(167, 139, 250, 0.7) !important;
+  box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.5) inset;
+}
+
+.thumb {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 0.4rem;
+  display: block;
+  background: #111;
+}
+
+.thumbLabel {
+  font-size: clamp(0.6rem, 0.55rem + 0.15vw, 0.7rem);
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  color: #ece4ff;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Detail */
+.detail {
+  display: grid;
+  grid-template-rows: 1fr;
+  gap: clamp(0.6rem, 1.5vw, 1rem);
+  min-height: 0;
+}
+
+.viewport {
+  position: relative;
+  border-radius: 0.6rem;
+  border: 1px solid rgba(167, 139, 250, 0.18);
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(167, 139, 250, 0.08), transparent 60%),
+    #050507;
+  min-height: 320px;
+  width: 100%;
+  height: 100%;
+}
+
+.canvas {
+  position: absolute !important;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Edge re-open tabs (shown only when a panel is hidden) */
+.reopenTab {
+  position: absolute;
+  top: 0.6rem;
+  z-index: 3;
+  min-height: 32px;
+  padding: 0 0.7rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(167, 139, 250, 0.28);
+  background: rgba(8, 6, 24, 0.7);
+  backdrop-filter: blur(10px);
+  color: #ece4ff;
+  font-family: var(--font-mono, ui-monospace);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.reopenTab:focus-visible {
+  outline: 2px solid var(--color-focus-ring, #a78bfa);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .reopenTab:hover {
+    background: rgba(167, 139, 250, 0.18);
+    border-color: rgba(167, 139, 250, 0.5);
+  }
+}
+
+.reopenLeft {
+  left: 0.6rem;
+}
+
+.reopenRight {
+  right: 0.6rem;
+}
+
+/* Inline close (×) buttons inside overlays */
+.closeButton {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 0.3rem;
+  border: 1px solid rgba(167, 139, 250, 0.22);
+  background: rgba(8, 6, 24, 0.6);
+  color: #c8b8ff;
+  font-family: var(--font-mono, ui-monospace);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.closeButton:focus-visible {
+  outline: 2px solid var(--color-focus-ring, #a78bfa);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .closeButton:hover {
+    background: rgba(167, 139, 250, 0.18);
+    border-color: rgba(167, 139, 250, 0.5);
+    color: #fff;
+  }
+}
+
+/* Position close button in image overlay */
+.imageOverlay .closeButton {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  z-index: 1;
+}
+
+/* Image overlay (top-left of viewport) */
+.imageOverlay {
+  position: absolute;
+  top: 0.6rem;
+  left: 0.6rem;
+  z-index: 2;
+  margin: 0;
+  width: clamp(180px, 28%, 340px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.5rem;
+  border-radius: 0.6rem;
+  background: rgba(8, 6, 24, 0.7);
+  border: 1px solid rgba(167, 139, 250, 0.28);
+  backdrop-filter: blur(10px);
+  pointer-events: auto;
+}
+
+.image {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 0.4rem;
+  background: #111;
+  display: block;
+}
+
+.caption {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  font-family: var(--font-mono, ui-monospace);
+}
+
+.captionTitle {
+  font-size: clamp(0.65rem, 0.6rem + 0.15vw, 0.75rem);
+  color: #ece4ff;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.captionCredit {
+  font-size: clamp(0.6rem, 0.55rem + 0.1vw, 0.7rem);
+  color: var(--color-text-muted, #9a9a9a);
+  line-height: 1.3;
+}
+
+.captionCredit a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: rgba(167, 139, 250, 0.35);
+}
+
+.captionCredit a:hover {
+  color: #a78bfa;
+}
+
+/* Controls overlay (right side of viewport, like project panels) */
+.controlsOverlay {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  bottom: 0.6rem;
+  z-index: 2;
+  width: clamp(220px, 26%, 320px);
+  padding: 0.7rem 0.85rem 0.6rem;
+  border-radius: 0.6rem;
+  background: rgba(8, 6, 24, 0.78);
+  border: 1px solid rgba(167, 139, 250, 0.28);
+  backdrop-filter: blur(12px);
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  overflow-y: auto;
+  pointer-events: auto;
+}
+
+.controlsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.4rem;
+}
+
+.controlsHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.controlsTitle {
+  font-family: var(--font-mono, ui-monospace);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #b8a6ff;
+}
+
+.resetButton {
+  min-height: 32px;
+  padding: 0 0.7rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(167, 139, 250, 0.28);
+  background: rgba(167, 139, 250, 0.08);
+  color: #ece4ff;
+  font-family: var(--font-mono, ui-monospace);
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.resetButton:focus-visible {
+  outline: 2px solid var(--color-focus-ring, #a78bfa);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .resetButton:hover {
+    background: rgba(167, 139, 250, 0.18);
+  }
+}
+
+/* DESKTOP: rail on the left, two-column stage. */
+@media (min-width: 1024px) {
+  .layout {
+    grid-template-columns: 220px 1fr;
+    grid-template-rows: 1fr;
+  }
+
+  .railList {
+    grid-template-columns: 1fr;
+    grid-auto-rows: min-content;
+    gap: 0.5rem;
+    overflow-y: auto;
+    overflow-x: hidden;
+    height: 100%;
+    padding-right: 0.25rem;
+  }
+
+  .railItem {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.4rem;
+  }
+
+  .thumb {
+    width: 56px;
+    height: 56px;
+    aspect-ratio: 1;
+    flex: 0 0 auto;
+  }
+
+  .thumbLabel {
+    -webkit-line-clamp: 3;
+    flex: 1 1 auto;
+  }
+}

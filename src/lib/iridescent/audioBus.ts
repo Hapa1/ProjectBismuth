@@ -17,6 +17,12 @@ export interface UseAudioUniformsOptions {
   mirageDecay?: number;
   /** Floor below which the envelope settles between beats. */
   mirageFloor?: number;
+  /** Peak ceiling for the envelope on a beat. Default 1.3. Lower = dimmer beats. */
+  mirageCeiling?: number;
+  /** Baseline target on beat before energy is added. Default 0.7. */
+  mirageBase?: number;
+  /** Energy-to-target multiplier on beat. Default 1.6. */
+  mirageGain?: number;
   /** Beat detector settings. Pass false to disable beat-driven mirage. */
   beat?: BeatDetectorOptions | false;
 }
@@ -37,6 +43,9 @@ export function useAudioUniforms(
   const timeScale = options.timeScale ?? 1.0;
   const decay = options.mirageDecay ?? 2.4;
   const floor = options.mirageFloor ?? 0.45;
+  const ceiling = options.mirageCeiling ?? 1.3;
+  const base = options.mirageBase ?? 0.7;
+  const gain = options.mirageGain ?? 1.6;
 
   const detectorRef = useRef<BeatDetector | null>(null);
   if (options.beat !== false && detectorRef.current === null) {
@@ -70,7 +79,7 @@ export function useAudioUniforms(
       if (det) {
         const beat = det.step(dt, bands);
         if (beat.fired) {
-          const target = Math.min(1.3, 0.7 + beat.energy * reactivity * 1.6);
+          const target = Math.min(ceiling, base + beat.energy * reactivity * gain);
           envRef.current = Math.max(envRef.current, target);
         }
       }

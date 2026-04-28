@@ -1,0 +1,5 @@
+import{u as h,j as e}from"./index-DcEJArLt.js";const p={id:"practical",title:"Why This Is Practical"};function l(t){const n={p:"p",...h(),...t.components},{Body:o,Eyebrow:r,Overlay:s,Placeholder:a,Title:c}=n;return o||i("Body"),r||i("Eyebrow"),s||i("Overlay"),a||i("Placeholder"),c||i("Title"),e.jsxs(e.Fragment,{children:[e.jsx(a,{shape:"grid-icons",caption:"Demo: practical applications (placeholder)"}),`
+`,e.jsxs(s,{position:"bottom-left",children:[e.jsx(r,{children:"Why It Matters"}),e.jsx(c,{children:"Why This Is Practical"}),e.jsx(o,{children:e.jsx(n.p,{children:`The same geometry that makes nature efficient also makes human design\r
+better. Medicine, engineering, earth science, signal processing, and\r
+architecture all lean on these shapes. Once you see the pattern, you\r
+start seeing where it can be used.`})})]})]})}function m(t={}){const{wrapper:n}={...h(),...t.components};return n?e.jsx(n,{...t,children:e.jsx(l,{...t})}):l(t)}function i(t,n){throw new Error("Expected component `"+t+"` to be defined: you likely forgot to import, pass, or provide it.")}export{m as default,p as meta};

@@ -2,14 +2,18 @@ import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { IRIDESCENT_FRAG, IRIDESCENT_VERT } from './shaders.glsl';
 import {
+  BLEED_EFFECT_INDEX,
   DEFAULT_PALETTE_OFFSET,
   type IridescentMaterialOptions,
   type IridescentPaletteMode,
 } from './types';
 
+const MAX_PULSES = 8;
+
 const PALETTE_MODE_INDEX: Record<IridescentPaletteMode, number> = {
   cosine: 0,
   colorField: 1,
+  bleed: 2,
 };
 
 /**
@@ -25,12 +29,19 @@ export function useIridescentMaterial(options: IridescentMaterialOptions = {}): 
   const material = useMemo(() => {
     const offset = options.paletteOffset ?? DEFAULT_PALETTE_OFFSET;
     const palette = options.palette ?? 'cosine';
+    const isBleed = palette === 'bleed';
+    const pulsePos = Array.from({ length: MAX_PULSES }, () => new THREE.Vector3());
+    const pulseI = new Float32Array(MAX_PULSES);
+    const pulseHue = new Float32Array(MAX_PULSES);
+    const pulseAge = new Float32Array(MAX_PULSES);
     return new THREE.ShaderMaterial({
       vertexShader: IRIDESCENT_VERT,
       fragmentShader: IRIDESCENT_FRAG,
-      transparent: true,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
+      // Bleed mode wants opaque crystals so the spotlights read as surface
+      // illumination; the other modes render as additive iridescent veils.
+      transparent: !isBleed,
+      depthWrite: isBleed,
+      blending: isBleed ? THREE.NormalBlending : THREE.AdditiveBlending,
       side: options.side ?? THREE.DoubleSide,
       uniforms: {
         uTime: { value: 0 },
@@ -45,6 +56,17 @@ export function useIridescentMaterial(options: IridescentMaterialOptions = {}): 
         uRimBoost: { value: options.rimBoost ?? 1.6 },
         uInnerWash: { value: options.innerWash ?? 0.35 },
         uAlphaBase: { value: options.alphaBase ?? 0.0 },
+        // Bleed-only uniforms; declared always so the shader compiles regardless of mode.
+        uPointer: { value: new THREE.Vector3() },
+        uPointerStrength: { value: 0 },
+        uPointerRadius: { value: 1.5 },
+        uPulseCount: { value: 0 },
+        uPulsePos: { value: pulsePos },
+        uPulseI: { value: pulseI },
+        uPulseHue: { value: pulseHue },
+        uPulseAge: { value: pulseAge },
+        uPulseTravel: { value: 4.0 },
+        uEffect: { value: BLEED_EFFECT_INDEX.rings },
       },
     });
     // Material is rebuilt only on palette/side changes, which require a

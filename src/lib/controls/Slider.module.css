@@ -1,0 +1,37 @@
+.row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.3rem;
+}
+
+.label {
+  font-size: 0.74rem;
+  color: #ece4ff;
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.value {
+  font-size: 0.74rem;
+  color: #b8a6ff;
+  min-width: 3.2rem;
+  text-align: right;
+  font-family: var(--font-mono);
+}
+
+.slider {
+  grid-column: 1 / -1;
+  width: 100%;
+  min-height: 44px;
+  accent-color: #a78bfa;
+  background: transparent;
+}
+
+.slider:focus-visible {
+  outline: 2px solid var(--color-focus-ring, #a78bfa);
+  outline-offset: 2px;
+  border-radius: 4px;
+}

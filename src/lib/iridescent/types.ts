@@ -1,7 +1,16 @@
 import * as THREE from 'three';
 import type { AudioBands } from '../useAudioAnalyser';
 
-export type IridescentPaletteMode = 'cosine' | 'colorField';
+export type IridescentPaletteMode = 'cosine' | 'colorField' | 'bleed';
+
+export type BleedEffect = 'rings' | 'bloom' | 'streaks' | 'sparkle';
+
+export const BLEED_EFFECT_INDEX: Record<BleedEffect, number> = {
+  rings: 0,
+  bloom: 1,
+  streaks: 2,
+  sparkle: 3,
+};
 
 /** Default cosine-spectrum offset — Apex's violet→cyan→pink palette. */
 export const DEFAULT_PALETTE_OFFSET: readonly [number, number, number] = [0.55, 0.88, 1.22];

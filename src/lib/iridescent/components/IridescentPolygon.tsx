@@ -13,6 +13,10 @@ export interface IridescentPolygonProps extends IridescentMaterialOptions {
   variant?: 'outline' | 'filled';
   /** Outline tube radius (world units). Only used when variant='outline'. */
   outlineWidth?: number;
+  /** Tube cross-section segments (outline only). Default 16. */
+  radialSegments?: number;
+  /** Tessellation segments along the curve (outline only). Default = sides * 8. */
+  tubularSegments?: number;
   /** Rotation about local Z (radians). Default 0. */
   rotationZ?: number;
   /**
@@ -34,6 +38,8 @@ export function IridescentPolygon({
   radius = 1,
   variant = 'outline',
   outlineWidth = 0.03,
+  radialSegments = 16,
+  tubularSegments,
   rotationZ = 0,
   material: externalMaterial,
   position,
@@ -83,6 +89,8 @@ export function IridescentPolygon({
       points={points}
       width={outlineWidth}
       closed
+      radialSegments={radialSegments}
+      tubularSegments={tubularSegments ?? Math.max(64, Math.floor(sides) * 8)}
       material={material}
       position={position}
       rotation={rotation}

@@ -24,6 +24,8 @@ export interface IridescentSolidProps extends IridescentMaterialOptions {
    * material across many nodes in a fractal tree.
    */
   material?: THREE.ShaderMaterial;
+  /** Forwarded ref to the underlying mesh — useful for collecting world positions. */
+  meshRef?: React.Ref<THREE.Mesh>;
   position?: [number, number, number];
   rotation?: [number, number, number];
   scale?: [number, number, number] | number;
@@ -65,6 +67,7 @@ export function IridescentSolid({
   segments = 4,
   wireframe = false,
   material: externalMaterial,
+  meshRef,
   position,
   rotation,
   scale,
@@ -97,6 +100,7 @@ export function IridescentSolid({
 
   return (
     <mesh
+      ref={meshRef}
       geometry={geometry}
       material={renderMaterial}
       position={position}
