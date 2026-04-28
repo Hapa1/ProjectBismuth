@@ -19,6 +19,13 @@ export interface ArtistEntry {
   instagramUrl: string;
   /** Public-relative path to a square hero image. Falls back to SVG on 404. */
   imageSrc?: string;
+  /**
+   * Optional Instagram post URL (e.g. `https://www.instagram.com/p/Cabc123/`).
+   * When set, the carousel card replaces the static image with Instagram's
+   * official embed iframe so the artist's actual post is shown inline.
+   * Takes precedence over `imageSrc`.
+   */
+  instagramPostUrl?: string;
   /** Override the CTA wording. Defaults to "View on Instagram ↗". */
   ctaLabel?: string;
   /** Override the CTA destination. Defaults to `instagramUrl`. */
@@ -34,15 +41,16 @@ export const ARTISTS: ArtistEntry[] = [
       'Plotter pioneer of "Fidenza" — generative paintings whose flow fields look hand-drawn. A gateway artist for code-as-art.',
     instagramUrl: 'https://www.instagram.com/tylerxhobbs/',
     imageSrc: '/slides/artists/tyler-hobbs.jpg',
+    instagramPostUrl: 'https://www.instagram.com/p/DWZA-ZWjfY5/',
   },
   {
-    id: 'manolo-gamboa-naon',
-    name: 'Manolo Gamboa Naon',
-    handle: 'manoloide',
+    id: 'uon-visuals',
+    name: 'UON Visuals',
+    handle: 'uon.visuals',
     description:
-      'Color-saturated geometric studies in Processing. His work feels like Bauhaus posters built by a stochastic algorithm.',
-    instagramUrl: 'https://www.instagram.com/manoloide/',
-    imageSrc: '/slides/artists/manolo-gamboa-naon.jpg',
+      'Cinematic 3D motion studies — moody, hyper-detailed renders that feel like stills from a film that doesn\u2019t exist yet.',
+    instagramUrl: 'https://www.instagram.com/uon.visuals/',
+    instagramPostUrl: 'https://www.instagram.com/p/DWC4c7_vXNN/',
   },
   {
     id: 'zach-lieberman',
@@ -52,50 +60,24 @@ export const ARTISTS: ArtistEntry[] = [
       'Co-creator of openFrameworks. Daily sketches that turn typography, light, and motion into kinetic toys.',
     instagramUrl: 'https://www.instagram.com/zach.lieberman/',
     imageSrc: '/slides/artists/zach-lieberman.jpg',
+    instagramPostUrl: 'https://www.instagram.com/p/DXntI69jiSZ/',
   },
   {
-    id: 'memo-akten',
-    name: 'Memo Akten',
-    handle: 'memotv',
+    id: 'madmaraca',
+    name: 'Mad Maraca',
+    handle: 'madmaraca',
     description:
-      'Trains neural nets to dream — luminous, painterly video where the model is the brush, the artist is the prompt.',
-    instagramUrl: 'https://www.instagram.com/memotv/',
-    imageSrc: '/slides/artists/memo-akten.jpg',
+      'Vibrant generative compositions — dense algorithmic patterns layered with bold colour and restless geometric energy.',
+    instagramUrl: 'https://www.instagram.com/madmaraca/',
+    instagramPostUrl: 'https://www.instagram.com/p/DXR3QkUiv--/',
   },
   {
-    id: 'casey-reas',
-    name: 'Casey Reas',
-    handle: 'reas',
+    id: 'kgolid',
+    name: 'Kjetil Golid',
+    handle: 'kgolid',
     description:
-      'Co-creator of Processing. Software-as-material work that influenced an entire generation of creative coders.',
-    instagramUrl: 'https://www.instagram.com/reas/',
-    imageSrc: '/slides/artists/casey-reas.jpg',
-  },
-  {
-    id: 'refik-anadol',
-    name: 'Refik Anadol',
-    handle: 'refikanadol',
-    description:
-      'Data sculptures at architectural scale — museum collections, weather, and memory rendered as flowing pigment.',
-    instagramUrl: 'https://www.instagram.com/refikanadol/',
-    imageSrc: '/slides/artists/refik-anadol.jpg',
-  },
-  {
-    id: 'jared-tarbell',
-    name: 'Jared Tarbell',
-    handle: 'jared.tarbell',
-    description:
-      'Early Flash-era generative art ("Substrate", "Happy Place"). Quietly gorgeous geometry that still reads as fresh.',
-    instagramUrl: 'https://www.instagram.com/jared.tarbell/',
-    imageSrc: '/slides/artists/jared-tarbell.jpg',
-  },
-  {
-    id: 'lauren-lee-mccarthy',
-    name: 'Lauren Lee McCarthy',
-    handle: 'laurenleemccarthy',
-    description:
-      'Creator of p5.js. Performance and software work probing what it feels like to live alongside automated systems.',
-    instagramUrl: 'https://www.instagram.com/laurenleemccarthy/',
-    imageSrc: '/slides/artists/lauren-lee-mccarthy.jpg',
+      'Meticulous algorithmic compositions — precise pen-plotter lines and sharp geometric systems that reward close inspection.',
+    instagramUrl: 'https://www.instagram.com/kgolid/',
+    instagramPostUrl: 'https://www.instagram.com/p/DPgh_WJjHTx/',
   },
 ];

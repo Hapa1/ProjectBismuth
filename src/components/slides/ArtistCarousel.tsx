@@ -41,6 +41,7 @@ export function ArtistCarousel({
       artists.map((a) => ({
         id: a.id,
         imageSrc: a.imageSrc,
+        instagramPostUrl: a.instagramPostUrl,
         title: a.name,
         subtitle: `@${a.handle}`,
         description: a.description,

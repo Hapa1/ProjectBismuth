@@ -14,7 +14,7 @@ export const slideRegistry: SlideRegistryEntry[] = [
     load: () => import('./content/01-opening.mdx'),
   },
   {
-    meta: { id: 'the-question', title: 'The Question' },
+    meta: { id: 'the-question', title: 'Intro to Sacred Geometry' },
     load: () => import('./content/02-the-question.mdx'),
   },
   {

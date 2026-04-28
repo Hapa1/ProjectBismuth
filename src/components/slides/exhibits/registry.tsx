@@ -1,5 +1,4 @@
 import type { ExhibitDef } from './types';
-import { GeometriaScene } from './cells/GeometriaScene';
 import { FlowerOfLifeScene } from './cells/FlowerOfLifeScene';
 import { MandalaScene } from './cells/MandalaScene';
 import { RoseWindowScene } from './cells/RoseWindowScene';
@@ -26,12 +25,8 @@ export const EXHIBITS: ExhibitDef[] = [
       licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
       sourceUrl: "https://commons.wikimedia.org/wiki/File:Euclid%27s_Elements,_1482.jpg",
     },
-    controls: [
-      { id: 'circles', label: 'Stage', min: 1, max: 5, step: 1, default: 4, format: (v) => ["Circle", "Seed of Life", "Flower of Life", "Metatron's Cube", 'Platonic Solids'][Math.round(v) - 1] ?? String(Math.round(v)) },
-      { id: 'hue', label: 'Hue', min: 0, max: 6.28, step: 0.05, default: 0, format: (v) => v.toFixed(2) },
-      { id: 'spin', label: 'Spin', min: 0, max: 0.3, step: 0.01, default: 0.06, format: (v) => v.toFixed(2) },
-    ],
-    render: ({ params }) => <GeometriaScene params={params} />,
+    controls: [],
+    projectId: 'geometria',
   },
   {
     id: 'flower-of-life',

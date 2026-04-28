@@ -140,9 +140,11 @@ interface SharedState {
 
 type SharedRef = React.MutableRefObject<SharedState>;
 
+const REST_POINTER_STRENGTH = 0.75;
+
 function makeShared(): SharedState {
   return {
-    pointer: { world: new THREE.Vector3(), strength: 0, targetStrength: 0 },
+    pointer: { world: new THREE.Vector3(0, 0, 0), strength: REST_POINTER_STRENGTH, targetStrength: REST_POINTER_STRENGTH },
     pulses: [],
   };
 }
@@ -172,7 +174,7 @@ function PointerTracker({
       sharedRef.current.pointer.targetStrength = 1;
     };
     const onLeave = () => {
-      sharedRef.current.pointer.targetStrength = 0;
+      sharedRef.current.pointer.targetStrength = REST_POINTER_STRENGTH;
     };
     el.addEventListener('pointermove', onMove);
     el.addEventListener('pointerleave', onLeave);

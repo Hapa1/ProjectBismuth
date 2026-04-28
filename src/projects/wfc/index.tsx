@@ -5,10 +5,14 @@ import styles from './WFC.module.css';
 
 type TilesetName = 'pipes' | 'circuit' | 'terrain';
 
+type TerrainBiomeCode = 'D' | 'W' | 'S' | 'G' | 'F' | 'R' | 'N';
+
 interface TileDef {
   sockets: [string, string, string, string];
   weight: number;
   drawId: string;
+  biomeIndices?: [number, number, number, number];
+  biomeAverage?: number;
 }
 
 interface Tileset {
@@ -29,13 +33,24 @@ interface Controls {
 }
 
 const DEFAULT_CONTROLS: Controls = {
-  tileset: 'pipes',
+  tileset: 'terrain',
   gridSize: 24,
   stepsPerFrame: 12,
   autoRestart: true,
   showEntropy: false,
   paused: false,
 };
+
+interface TerrainBiome {
+  code: TerrainBiomeCode;
+  color: string;
+  pureWeight: number;
+}
+
+interface TerrainBiasField {
+  targets: number[];
+  edgeExposure: number[];
+}
 
 function buildPipeTiles(): TileDef[] {
   const patterns: Array<[string, string, string, string]> = [
@@ -132,49 +147,229 @@ const CIRCUIT_TILESET: Tileset = {
   },
 };
 
+const TERRAIN_BIOMES: readonly TerrainBiome[] = [
+  { code: 'D', color: '#0f2740', pureWeight: 4.6 },
+  { code: 'W', color: '#1d5686', pureWeight: 4.2 },
+  { code: 'S', color: '#d8ba74', pureWeight: 3.7 },
+  { code: 'G', color: '#4f8d45', pureWeight: 4.4 },
+  { code: 'F', color: '#2f5f38', pureWeight: 3.3 },
+  { code: 'R', color: '#6a6762', pureWeight: 3.1 },
+  { code: 'N', color: '#eef4fa', pureWeight: 2.4 },
+] as const;
+
+const TERRAIN_COLORS: Record<TerrainBiomeCode, string> = Object.fromEntries(
+  TERRAIN_BIOMES.map((biome) => [biome.code, biome.color]),
+) as Record<TerrainBiomeCode, string>;
+
+const TERRAIN_BIOME_INDEX = Object.fromEntries(
+  TERRAIN_BIOMES.map((biome, index) => [biome.code, index]),
+) as Record<TerrainBiomeCode, number>;
+
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function smoothstep(edge0: number, edge1: number, value: number) {
+  const t = clamp((value - edge0) / (edge1 - edge0), 0, 1);
+  return t * t * (3 - 2 * t);
+}
+
+function hash2D(x: number, y: number, seed: number) {
+  const n = Math.sin(x * 127.1 + y * 311.7 + seed * 74.7) * 43758.5453123;
+  return n - Math.floor(n);
+}
+
+function valueNoise2D(x: number, y: number, seed: number) {
+  const x0 = Math.floor(x);
+  const y0 = Math.floor(y);
+  const x1 = x0 + 1;
+  const y1 = y0 + 1;
+  const tx = x - x0;
+  const ty = y - y0;
+  const sx = tx * tx * (3 - 2 * tx);
+  const sy = ty * ty * (3 - 2 * ty);
+
+  const n00 = hash2D(x0, y0, seed);
+  const n10 = hash2D(x1, y0, seed);
+  const n01 = hash2D(x0, y1, seed);
+  const n11 = hash2D(x1, y1, seed);
+
+  const nx0 = n00 + (n10 - n00) * sx;
+  const nx1 = n01 + (n11 - n01) * sx;
+  return nx0 + (nx1 - nx0) * sy;
+}
+
+function fbm2D(x: number, y: number, seed: number, octaves = 4) {
+  let amplitude = 0.5;
+  let frequency = 1;
+  let total = 0;
+  let normalizer = 0;
+
+  for (let octave = 0; octave < octaves; octave++) {
+    total += valueNoise2D(x * frequency, y * frequency, seed + octave * 17.13) * amplitude;
+    normalizer += amplitude;
+    amplitude *= 0.5;
+    frequency *= 2;
+  }
+
+  return total / normalizer;
+}
+
 function buildTerrainTiles(): TileDef[] {
   const tiles: TileDef[] = [];
   const seen = new Set<string>();
-  const pairs: Array<[string, string]> = [
-    ['W', 'S'],
-    ['S', 'G'],
-  ];
-  for (const [a, b] of pairs) {
-    for (let mask = 0; mask < 16; mask++) {
-      const q: [string, string, string, string] = [
+
+  const pushTile = (corners: [TerrainBiomeCode, TerrainBiomeCode, TerrainBiomeCode, TerrainBiomeCode]) => {
+    const key = corners.join('');
+    if (seen.has(key)) return;
+    seen.add(key);
+
+    const sockets: [string, string, string, string] = [
+      corners[0] + corners[1],
+      corners[1] + corners[3],
+      corners[2] + corners[3],
+      corners[0] + corners[2],
+    ];
+    const biomeIndices = corners.map((code) => TERRAIN_BIOME_INDEX[code]) as [
+      number,
+      number,
+      number,
+      number,
+    ];
+    const uniqueCount = new Set(corners).size;
+    const transitionCount =
+      Number(corners[0] !== corners[1]) +
+      Number(corners[1] !== corners[3]) +
+      Number(corners[3] !== corners[2]) +
+      Number(corners[2] !== corners[0]);
+
+    let weight = 1;
+    if (uniqueCount === 1) {
+      weight = TERRAIN_BIOMES[biomeIndices[0]].pureWeight;
+    } else if (transitionCount === 2) {
+      weight = 1.55;
+    } else if (transitionCount === 4) {
+      weight = 0.45;
+    } else {
+      weight = 0.9;
+    }
+
+    tiles.push({
+      sockets,
+      weight,
+      drawId: key,
+      biomeIndices,
+      biomeAverage: biomeIndices.reduce((sum, value) => sum + value, 0) / biomeIndices.length,
+    });
+  };
+
+  for (const biome of TERRAIN_BIOMES) {
+    pushTile([biome.code, biome.code, biome.code, biome.code]);
+  }
+
+  for (let i = 0; i < TERRAIN_BIOMES.length - 1; i++) {
+    const a = TERRAIN_BIOMES[i].code;
+    const b = TERRAIN_BIOMES[i + 1].code;
+    for (let mask = 1; mask < 15; mask++) {
+      pushTile([
         mask & 1 ? b : a,
         mask & 2 ? b : a,
         mask & 4 ? b : a,
         mask & 8 ? b : a,
-      ];
-      const key = q.join('');
-      if (seen.has(key)) continue;
-      seen.add(key);
-      const sockets: [string, string, string, string] = [
-        q[0] + q[1],
-        q[1] + q[3],
-        q[2] + q[3],
-        q[0] + q[2],
-      ];
-      const isPure = q[0] === q[1] && q[1] === q[2] && q[2] === q[3];
-      tiles.push({ sockets, weight: isPure ? 4 : 1, drawId: key });
+      ]);
     }
   }
+
   return tiles;
 }
 
-const TERRAIN_COLORS: Record<string, string> = {
-  W: '#1e497a',
-  S: '#d8b66a',
-  G: '#3a7d3a',
-};
+function buildTerrainBiasField(rows: number, cols: number): TerrainBiasField {
+  const targets: number[] = [];
+  const edgeExposure: number[] = [];
+  const elevationSeed = Math.random() * 1000;
+  const detailSeed = Math.random() * 1000 + 1000;
+  const moistureSeed = Math.random() * 1000 + 2000;
+  const maxIndex = TERRAIN_BIOMES.length - 1;
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const u = cols <= 1 ? 0.5 : c / (cols - 1);
+      const v = rows <= 1 ? 0.5 : r / (rows - 1);
+      const nx = u * 2 - 1;
+      const ny = v * 2 - 1;
+      const distance = Math.sqrt(nx * nx + ny * ny);
+      const edgeDistance = Math.min(u, v, 1 - u, 1 - v);
+      const edge = 1 - clamp(edgeDistance * 3.5, 0, 1);
+      const island = clamp(1 - Math.pow(distance, 1.25), 0, 1);
+      const broadNoise = fbm2D(u * 2.2 + 3.7, v * 2.2 + 9.1, elevationSeed);
+      const detailNoise = fbm2D(u * 5.4 + 17.2, v * 5.4 + 13.6, detailSeed);
+      const moisture = fbm2D(u * 3.1 + 7.8, v * 3.1 + 4.4, moistureSeed);
+
+      const elevation = clamp(
+        island * 0.72 +
+          (broadNoise - 0.5) * 0.34 +
+          (detailNoise - 0.5) * 0.18 -
+          edge * 0.24,
+        0,
+        1,
+      );
+
+      let target = elevation * maxIndex;
+      if (elevation > 0.36 && elevation < 0.78) {
+        target += (moisture - 0.44) * 1.4;
+      }
+      if (elevation > 0.84) {
+        target += smoothstep(0.84, 1, elevation) * 0.45;
+      }
+      if (edge > 0.72) {
+        target -= smoothstep(0.72, 1, edge) * 1.1;
+      }
+
+      targets.push(clamp(target, 0, maxIndex));
+      edgeExposure.push(edge);
+    }
+  }
+
+  return { targets, edgeExposure };
+}
+
+function terrainWeightForCell(
+  field: TerrainBiasField,
+  cols: number,
+  row: number,
+  col: number,
+  tile: TileDef,
+) {
+  if (tile.biomeAverage === undefined || tile.biomeIndices === undefined) {
+    return 1;
+  }
+
+  const index = row * cols + col;
+  const target = field.targets[index];
+  const edge = field.edgeExposure[index];
+  const meanDelta = Math.abs(tile.biomeAverage - target);
+  const span = Math.max(...tile.biomeIndices) - Math.min(...tile.biomeIndices);
+  const lowest = Math.min(...tile.biomeIndices);
+  let weight = Math.exp(-(meanDelta * meanDelta) / 1.35);
+
+  if (span > 1) {
+    weight *= 0.35;
+  }
+
+  if (edge > 0.7) {
+    const waterAffinity = 1 - lowest / (TERRAIN_BIOMES.length - 1);
+    weight *= 0.55 + waterAffinity * 0.9;
+  }
+
+  return Math.max(0.08, weight);
+}
 
 const TERRAIN_TILESET: Tileset = {
   name: 'terrain',
-  label: 'Terrain',
+  label: 'Biomes',
   tiles: buildTerrainTiles(),
   drawTile: (p, tile, size) => {
-    const q = tile.drawId.split('');
+    const q = tile.drawId.split('') as TerrainBiomeCode[];
     const half = size / 2;
     p.noStroke();
     p.fill(TERRAIN_COLORS[q[0]]);
@@ -185,6 +380,40 @@ const TERRAIN_TILESET: Tileset = {
     p.rect(0, half, half, half);
     p.fill(TERRAIN_COLORS[q[3]]);
     p.rect(half, half, half, half);
+
+    p.stroke('#0a0f14');
+    p.strokeWeight(Math.max(1, size * 0.04));
+    if (q[0] !== q[1]) p.line(half, 0, half, half);
+    if (q[0] !== q[2]) p.line(0, half, half, half);
+    if (q[1] !== q[3]) p.line(half, half, size, half);
+    if (q[2] !== q[3]) p.line(half, half, half, size);
+
+    p.noStroke();
+    const uniqueBiomes = new Set(q);
+    if (uniqueBiomes.size === 1) {
+      switch (q[0]) {
+        case 'D':
+        case 'W':
+          p.fill(255, 255, 255, q[0] === 'D' ? 18 : 28);
+          p.rect(0, size * 0.18, size, size * 0.08);
+          p.rect(0, size * 0.58, size, size * 0.06);
+          break;
+        case 'F':
+          p.fill(0, 0, 0, 26);
+          p.circle(size * 0.35, size * 0.35, size * 0.16);
+          p.circle(size * 0.7, size * 0.58, size * 0.14);
+          break;
+        case 'R':
+          p.fill(255, 255, 255, 18);
+          p.rect(size * 0.18, size * 0.22, size * 0.54, size * 0.06);
+          p.rect(size * 0.32, size * 0.54, size * 0.4, size * 0.05);
+          break;
+        case 'N':
+          p.fill(255, 255, 255, 32);
+          p.rect(size * 0.16, size * 0.18, size * 0.68, size * 0.12);
+          break;
+      }
+    }
   },
   drawBackground: (p, w, h) => {
     p.noStroke();
@@ -209,13 +438,22 @@ class WFC {
   rows: number;
   cols: number;
   tiles: TileDef[];
+  tileWeightAt?: (row: number, col: number, tile: TileDef) => number;
   failed = false;
   done = false;
 
-  constructor(rows: number, cols: number, tiles: TileDef[]) {
+  constructor(
+    rows: number,
+    cols: number,
+    tiles: TileDef[],
+    options?: {
+      tileWeightAt?: (row: number, col: number, tile: TileDef) => number;
+    },
+  ) {
     this.rows = rows;
     this.cols = cols;
     this.tiles = tiles;
+    this.tileWeightAt = options?.tileWeightAt;
     const all = tiles.map((_, i) => i);
     this.cells = Array.from({ length: rows * cols }, () => ({
       options: all.slice(),
@@ -246,14 +484,23 @@ class WFC {
     }
 
     const cell = this.cells[best];
+    const bestRow = Math.floor(best / this.cols);
+    const bestCol = best % this.cols;
+    const weightedOptions = cell.options.map((idx) => ({
+      idx,
+      weight: Math.max(
+        0.001,
+        this.tiles[idx].weight * (this.tileWeightAt?.(bestRow, bestCol, this.tiles[idx]) ?? 1),
+      ),
+    }));
     let totalW = 0;
-    for (const idx of cell.options) totalW += this.tiles[idx].weight;
+    for (const option of weightedOptions) totalW += option.weight;
     let r = Math.random() * totalW;
     let chosen = cell.options[0];
-    for (const idx of cell.options) {
-      r -= this.tiles[idx].weight;
+    for (const option of weightedOptions) {
+      r -= option.weight;
       if (r <= 0) {
-        chosen = idx;
+        chosen = option.idx;
         break;
       }
     }
@@ -318,6 +565,7 @@ interface SketchState {
   cellSize: number;
   offsetX: number;
   offsetY: number;
+  terrainBias?: TerrainBiasField;
   signature: string;
 }
 
@@ -333,12 +581,18 @@ function buildSketchState(
   const usedH = cellSize * grid;
   const offsetX = Math.floor((width - usedW) / 2);
   const offsetY = Math.floor((height - usedH) / 2);
+  const terrainBias = controls.tileset === 'terrain' ? buildTerrainBiasField(grid, grid) : undefined;
   return {
-    wfc: new WFC(grid, grid, tileset.tiles),
+    wfc: new WFC(grid, grid, tileset.tiles, {
+      tileWeightAt: terrainBias
+        ? (row, col, tile) => terrainWeightForCell(terrainBias, grid, row, col, tile)
+        : undefined,
+    }),
     tileset,
     cellSize,
     offsetX,
     offsetY,
+    terrainBias,
     signature: `${controls.tileset}:${grid}:${width}x${height}`,
   };
 }
@@ -369,7 +623,13 @@ function renderSketch(
         const t = cell.options.length / wfc.tiles.length;
         const v = Math.floor(18 + t * 60);
         p.noStroke();
-        p.fill(v, v, v + 8);
+        if (state.terrainBias && controls.tileset === 'terrain') {
+          const target = state.terrainBias.targets[r * wfc.cols + c];
+          const biome = TERRAIN_BIOMES[Math.round(target)];
+          p.fill(TERRAIN_COLORS[biome.code]);
+        } else {
+          p.fill(v, v, v + 8);
+        }
         p.rect(0, 0, cellSize, cellSize);
         if (controls.showEntropy && cellSize >= 18) {
           p.fill(220);
@@ -563,9 +823,9 @@ function WFCProject({ width, height }: ProjectComponentProps) {
             }
             aria-label="Tileset preset"
           >
+            <option value="terrain">Terrain (biomes)</option>
             <option value="pipes">Pipes</option>
             <option value="circuit">Circuit</option>
-            <option value="terrain">Terrain (biomes)</option>
           </select>
           <div className={styles.statusRow} style={{ marginTop: '0.4rem' }}>
             <span className={styles.statusBadge}>{tileCount} tiles</span>

@@ -10,6 +10,12 @@ export interface CarouselItem {
   id: string;
   /** Square image path. Falls back to a deterministic procedural SVG when absent or broken. */
   imageSrc?: string;
+  /**
+   * Optional Instagram post URL (e.g. `https://www.instagram.com/p/Cabc123/`).
+   * When set, the card renders Instagram's official `/embed` iframe instead
+   * of `imageSrc` so the actual post (image + caption) is shown inline.
+   */
+  instagramPostUrl?: string;
   /** Seed for the fallback SVG. Defaults to `id`. */
   fallbackSeed?: string;
   /** Primary card label (artist name, project title, etc.). */
@@ -158,11 +164,22 @@ function CarouselCard({ item, defaultCtaLabel }: CarouselCardProps) {
   const [errored, setErrored] = useState(false);
   const ctaLabel = item.ctaLabel ?? defaultCtaLabel;
   const seed = item.fallbackSeed ?? item.id;
+  const embedSrc = toInstagramEmbedSrc(item.instagramPostUrl);
 
   return (
-    <article className={styles.card}>
-      <div className={styles.media}>
-        {!errored && item.imageSrc ? (
+    <article className={`${styles.card} ${embedSrc ? styles.cardEmbed : ''}`}>
+      <div className={`${styles.media} ${embedSrc ? styles.mediaEmbed : ''}`}>
+        {embedSrc ? (
+          <iframe
+            className={styles.embed}
+            src={embedSrc}
+            title={`${item.title} on Instagram`}
+            loading="lazy"
+            scrolling="no"
+            allow="encrypted-media; fullscreen"
+            allowTransparency
+          />
+        ) : !errored && item.imageSrc ? (
           <img
             src={item.imageSrc}
             alt={item.title}
@@ -190,6 +207,29 @@ function CarouselCard({ item, defaultCtaLabel }: CarouselCardProps) {
       </a>
     </article>
   );
+}
+
+/**
+ * Normalize a public Instagram post URL into its embeddable iframe URL.
+ * Returns `undefined` for unsupported / malformed input so the caller can
+ * fall back to `imageSrc` or the procedural SVG.
+ *
+ * Accepts:
+ *   https://www.instagram.com/p/<id>/
+ *   https://www.instagram.com/reel/<id>/
+ *   https://www.instagram.com/tv/<id>/
+ */
+function toInstagramEmbedSrc(postUrl?: string): string | undefined {
+  if (!postUrl) return undefined;
+  try {
+    const u = new URL(postUrl);
+    if (!/(^|\.)instagram\.com$/.test(u.hostname)) return undefined;
+    const match = u.pathname.match(/^\/(p|reel|tv)\/([^/]+)\/?/);
+    if (!match) return undefined;
+    return `https://www.instagram.com/${match[1]}/${match[2]}/embed/captioned/`;
+  } catch {
+    return undefined;
+  }
 }
 
 // ---------------------------------------------------------------------------

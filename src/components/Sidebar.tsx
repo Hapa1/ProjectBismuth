@@ -16,7 +16,6 @@ export function Sidebar() {
   const currentPath = routerState.location.pathname;
   const isOnProjectRoute = /^\/projects\//.test(currentPath);
   const isHome = currentPath === '/';
-  const isDemo = currentPath === '/demo';
 
   // Auto-expand the Projects group on first visit to a project route this
   // session, but never override an explicit user toggle.
@@ -54,18 +53,6 @@ export function Sidebar() {
             >
               <span className={styles.navTitle}>Home</span>
               <span className={styles.navMeta}>presentation</span>
-            </Link>
-          </li>
-
-          <li>
-            <Link
-              to="/demo"
-              className={styles.navItem}
-              data-active={isDemo}
-              onClick={close}
-            >
-              <span className={styles.navTitle}>Demo Deck</span>
-              <span className={styles.navMeta}>geometry talk</span>
             </Link>
           </li>
 

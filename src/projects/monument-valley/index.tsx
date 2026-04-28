@@ -52,11 +52,28 @@ interface SceneState {
   doneTime: number;
 }
 
+interface SpriteMeta {
+  /** Cropped sprite (transparent rows/cols removed). */
+  image: P5Image;
+  /** Top-left x of the cropped bbox within the source sheet cell (inside TRIM_PX inset). */
+  bboxX: number;
+  /** Top-left y of the cropped bbox within the source sheet cell. */
+  bboxY: number;
+}
+
 interface SpriteCache {
-  /** Sprite sliced from the source sheet, indexed by sourceIndex 0..23. */
-  source: P5Image[];
+  /** Per-source-index metadata. Index null when the source sheet cell is unused. */
+  meta: (SpriteMeta | null)[];
+  /** Source sheet cell width (after TRIM_PX inset) — same for every sprite. */
   cellW: number;
+  /** Source sheet cell height (after TRIM_PX inset). */
   cellH: number;
+  /** Canonical floor-diamond width in source-cell pixels (from floor-plain index 0). */
+  diamondW: number;
+  /** Canonical floor-diamond center X in source-cell pixels. */
+  diamondCx: number;
+  /** Canonical floor-diamond center Y in source-cell pixels (widest row of floor sprite). */
+  diamondCy: number;
 }
 
 function buildCellBias(
@@ -83,10 +100,7 @@ function buildCellBias(
           m.set(idx, isEdge ? 0.2 : 1.4);
         } else if (
           v.baseId === 'temple-balcony' ||
-          v.baseId === 'tower-crenel' ||
-          v.baseId === 'balcony-curve' ||
-          v.baseId === 'balcony-square' ||
-          v.baseId === 'cantilever'
+          v.baseId === 'tower-crenel'
         ) {
           m.set(idx, isEdge ? 0.4 : 1.5);
         }
@@ -125,20 +139,105 @@ function snapshotCollapsed(wfc: Wfc2D): number[] {
 function buildSpriteCache(_p: P5, image: P5Image): SpriteCache {
   const cellW = Math.floor(image.width / SHEET_COLS);
   const cellH = Math.floor(image.height / SHEET_ROWS);
-  const source: P5Image[] = [];
+  const innerW = cellW - TRIM_PX * 2;
+  const innerH = cellH - TRIM_PX * 2;
+  const meta: (SpriteMeta | null)[] = [];
   for (let row = 0; row < SHEET_ROWS; row++) {
     for (let col = 0; col < SHEET_COLS; col++) {
       const sub = image.get(
         col * cellW + TRIM_PX,
         row * cellH + TRIM_PX,
-        cellW - TRIM_PX * 2,
-        cellH - TRIM_PX * 2,
+        innerW,
+        innerH,
       );
       keyOutBackground(sub);
-      source.push(sub);
+      meta.push(measureSprite(sub));
     }
   }
-  return { source, cellW: cellW - TRIM_PX * 2, cellH: cellH - TRIM_PX * 2 };
+  // Canonical diamond geometry from floor-plain (sourceIndex 0): a tile with
+  // nothing on top of it, so its widest opaque row IS the floor diamond.
+  const floorMeta = meta[0];
+  let diamondW = innerW;
+  let diamondCx = innerW / 2;
+  let diamondCy = innerH / 2;
+  if (floorMeta) {
+    const m = measureDiamond(floorMeta);
+    diamondW = m.w;
+    // Convert cropped-coords back into source-cell coords by adding bbox offset.
+    diamondCx = floorMeta.bboxX + m.cx;
+    diamondCy = floorMeta.bboxY + m.cy;
+  }
+  return { meta, cellW: innerW, cellH: innerH, diamondW, diamondCx, diamondCy };
+}
+
+/** Measures the widest opaque row in the bottom 60% of a cropped sprite. Used
+ *  ONLY for the canonical floor sprite to get diamond geometry. */
+function measureDiamond(m: SpriteMeta): { w: number; cx: number; cy: number } {
+  const img = m.image;
+  img.loadPixels();
+  const px = img.pixels;
+  const w = img.width;
+  const h = img.height;
+  const startY = Math.max(0, Math.floor(h * 0.4));
+  let bestRow = h - 1;
+  let bestSpan = 0;
+  let bestL = 0;
+  let bestR = w - 1;
+  for (let y = startY; y < h; y++) {
+    let l = -1;
+    let r = -1;
+    for (let x = 0; x < w; x++) {
+      if (px[(y * w + x) * 4 + 3] > 16) {
+        if (l < 0) l = x;
+        r = x;
+      }
+    }
+    if (l < 0) continue;
+    const span = r - l + 1;
+    if (span >= bestSpan) {
+      bestSpan = span;
+      bestRow = y;
+      bestL = l;
+      bestR = r;
+    }
+  }
+  return { w: bestSpan, cx: (bestL + bestR) / 2, cy: bestRow };
+}
+
+/**
+ * Crop the sprite to its opaque bounding box. Records bbox top-left so the
+ * sprite can be replaced at its original cell-relative position downstream.
+ * Returns null if the sprite is fully transparent.
+ */
+function measureSprite(img: P5Image): SpriteMeta | null {
+  img.loadPixels();
+  const px = img.pixels;
+  if (!px || px.length === 0) return null;
+  const w = img.width;
+  const h = img.height;
+  let minX = w;
+  let minY = h;
+  let maxX = -1;
+  let maxY = -1;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const a = px[(y * w + x) * 4 + 3];
+      if (a > 16) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  if (maxX < 0) return null;
+  const bw = maxX - minX + 1;
+  const bh = maxY - minY + 1;
+  return {
+    image: img.get(minX, minY, bw, bh),
+    bboxX: minX,
+    bboxY: minY,
+  };
 }/**
  * The source sheet has a cream background per cell. Remove it via a flood-fill
  * seeded from the four corners — only the contiguous outer region is keyed
@@ -230,13 +329,13 @@ function keyOutBackground(img: P5Image): void {
 function getVariantSprite(
   cache: SpriteCache,
   variant: TileVariant,
-): P5Image | null {
+): SpriteMeta | null {
   const base = variant.base;
   if (variant.rotation === 2 && base.pairedSourceIndex !== undefined) {
-    return cache.source[base.pairedSourceIndex];
+    return cache.meta[base.pairedSourceIndex];
   }
   if (base.sourceIndex == null) return null;
-  return cache.source[base.sourceIndex];
+  return cache.meta[base.sourceIndex];
 }
 
 interface SliderProps {
@@ -588,14 +687,41 @@ function advanceScene(
   if (scene.phase === 'collapsing-mid' && scene.mid) {
     runWfc(scene.mid, stepsPerFrame);
     if (scene.mid.failed) {
-      scene.phase = 'failed';
-      scene.doneTime = performance.now();
-      return;
+      // Soft-fail: snapshot what collapsed, fill the rest with empty-mid, and
+      // continue. Avoids a full scene restart on a single contradiction.
+      const fallback: number[] = new Array(scene.mid.cells.length);
+      for (let i = 0; i < scene.mid.cells.length; i++) {
+        const c = scene.mid.cells[i];
+        fallback[i] = c.collapsed ? c.options[0] : layerIdx.emptyMid;
+      }
+      scene.collapsedMid = fallback;
+      // Skip directly to top-pass via the normal done branch by marking mid done.
+      // (Continue execution below.)
     }
-    if (scene.mid.done) {
-      scene.collapsedMid = snapshotCollapsed(scene.mid);
+    if (scene.mid.done || scene.collapsedMid) {
+      if (!scene.collapsedMid) {
+        scene.collapsedMid = snapshotCollapsed(scene.mid);
+      }
       const W = scene.mid.width;
-      const topBias = buildCellBias(W, W, catalog, layerIdx.top, layerIdx.emptyTop);
+      const baseTopBias = buildCellBias(W, W, catalog, layerIdx.top, layerIdx.emptyTop);
+      // Shade-coupled top bias: a top tile may sit on a mid cell only if their
+      // shades match (or top is shade-neutral). Forbid mismatches by zero weight.
+      const topBias: Map<number, number>[] = [];
+      for (let y = 0; y < W; y++) {
+        for (let x = 0; x < W; x++) {
+          const m = new Map(baseTopBias[x + y * W]);
+          const midVariant = catalog[scene.collapsedMid[x + y * W]];
+          const midShade = midVariant.base.shade ?? 'neutral';
+          for (const idx of layerIdx.top) {
+            if (idx === layerIdx.emptyTop) continue;
+            const topShade = catalog[idx].base.shade ?? 'neutral';
+            if (topShade !== 'neutral' && midShade !== 'neutral' && topShade !== midShade) {
+              m.set(idx, 0);
+            }
+          }
+          topBias.push(m);
+        }
+      }
       scene.top = new Wfc2D({
         width: W,
         depth: W,
@@ -688,8 +814,9 @@ function worldToScreen(
   level: number,
 ): { sx: number; sy: number } {
   const sx = scene.originX + (x - y) * (scene.tileW / 2);
-  // Mid sprites (level 1) already include the cube body in their artwork, so
-  // they share the floor's anchor. Only top items (level 2) lift by one cube.
+  // Bbox-bottom anchoring already places mid features sitting on the floor,
+  // so level 1 needs no extra lift. Level 2 (top decorations) lifts by one
+  // cube height.
   const lift = level >= 2 ? scene.layerHeight : 0;
   const sy = scene.originY + (x + y) * (scene.tileH / 2) - lift;
   return { sx, sy };
@@ -703,17 +830,14 @@ function renderScene(
 ): void {
   const W = scene.ground.width;
   const order = buildRenderOrder(W);
-  // Sprite art has padding around the diamond; overscale slightly so adjacent
-  // floor diamonds touch instead of leaving visible cream gaps.
-  const drawScale = (scene.tileW / cache.cellW) * 1.18;
 
-  p.imageMode(p.CENTER);
+  p.imageMode(p.CORNER);
   p.noTint();
 
   for (const { x, y } of order) {
-    drawCellLayer(p, scene, cache, catalog, x, y, 0, drawScale);
-    drawCellLayer(p, scene, cache, catalog, x, y, 1, drawScale);
-    drawCellLayer(p, scene, cache, catalog, x, y, 2, drawScale);
+    drawCellLayer(p, scene, cache, catalog, x, y, 0);
+    drawCellLayer(p, scene, cache, catalog, x, y, 1);
+    drawCellLayer(p, scene, cache, catalog, x, y, 2);
   }
 }
 
@@ -726,7 +850,6 @@ function drawCellLayer(
   x: number,
   y: number,
   layerIdx: 0 | 1 | 2,
-  drawScale: number,
 ): void {
   const W = scene.ground.width;
   const i = x + y * W;
@@ -749,17 +872,38 @@ function drawCellLayer(
   }
   if (variantIndex < 0) return;
   const v = catalog[variantIndex];
-  const sprite = getVariantSprite(cache, v);
-  if (!sprite) return;
+  const meta = getVariantSprite(cache, v);
+  if (!meta) return;
 
   const { sx, sy } = worldToScreen(scene, x, y, layerIdx);
-  const drawW = cache.cellW * drawScale;
-  const drawH = cache.cellH * drawScale;
-  // Sprites have art roughly centered horizontally; vertical anchor pushes the
-  // cube's diamond top into our (sx, sy) position so layers stack visually.
-  const anchorY = sy - drawH * 0.18;
+  // Single canonical scale for ALL sprites (sheet pixel → world pixel).
+  const baseScale = scene.tileW / cache.diamondW;
+  const renderScale = v.base.renderScale ?? 1;
+  const scale = baseScale * renderScale;
+  // Cell-relative diamond-center anchoring. The artist drew the diamond at a
+  // consistent cell-local position across all 24 cells, so we reconstruct
+  // each sprite's cell origin from its stored bbox offset and place it so
+  // the canonical diamond center (measured from floor-plain) lands on
+  // (sx, sy). Robust to per-sprite bbox variation (fat floor rim vs. thin
+  // dais base vs. cube with no rim).
+  const bw = meta.image.width;
+  const bh = meta.image.height;
+  const cellOriginX = sx - cache.diamondCx * scale;
+  const cellOriginY = sy - cache.diamondCy * scale;
+  let drawX = cellOriginX + meta.bboxX * scale;
+  let drawY = cellOriginY + meta.bboxY * scale;
+  const drawW = bw * scale;
+  const drawH = bh * scale;
+  // For renderScale != 1 (e.g. portal-arch downsize) recenter around the
+  // diamond center so the sprite shrinks toward (sx, sy), not the corner.
+  if (renderScale !== 1) {
+    const centerX = drawX + drawW / 2;
+    const centerY = drawY + drawH / 2;
+    drawX += sx - centerX;
+    drawY += sy - centerY;
+  }
 
-  p.image(sprite, sx, anchorY, drawW, drawH);
+  p.image(meta.image, drawX, drawY, drawW, drawH);
 }
 
 export default MonumentValleyProject;

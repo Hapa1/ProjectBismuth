@@ -1,0 +1,6 @@
+import{u as d,j as e}from"./index-CuS_Sl1Z.js";const u={id:"v2-gargantua",title:"Gargantua"};function l(n){const t={p:"p",...d(),...n.components},{Body:a,Demo:i,Eyebrow:o,Overlay:s,Title:c}=t;return a||r("Body"),i||r("Demo"),o||r("Eyebrow"),s||r("Overlay"),c||r("Title"),e.jsxs(e.Fragment,{children:[e.jsx(i,{projectId:"gargantua"}),`
+`,e.jsxs(s,{position:"bottom-left",children:[e.jsx(o,{children:"Topic 3 · Gargantua"}),e.jsx(c,{children:"Physics as cinematic art"}),e.jsx(a,{children:e.jsx(t.p,{children:`The black hole in Interstellar was based on real physics — gravitational\r
+lensing, light bending around the event horizon, a warped accretion disk.\r
+Equations became cinema.`})}),e.jsx(a,{children:e.jsx(t.p,{children:`You probably can't write a physically accurate renderer from scratch. But\r
+AI can help you understand the approximation, and you can build a\r
+simplified shader that still feels cinematic.`})})]})]})}function h(n={}){const{wrapper:t}={...d(),...n.components};return t?e.jsx(t,{...n,children:e.jsx(l,{...n})}):l(n)}function r(n,t){throw new Error("Expected component `"+n+"` to be defined: you likely forgot to import, pass, or provide it.")}export{h as default,u as meta};

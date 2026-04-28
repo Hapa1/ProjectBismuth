@@ -202,7 +202,7 @@ function BlackHoleQuad({ controls, width, height, reduceMotion }: QuadProps) {
 
 // The shader also applies `diskTilt`, so the camera starts slightly higher than
 // a normal edge-on view to land at a cinematic angle after that transform.
-const CAMERA_INITIAL_Y = 4.5;
+const CAMERA_INITIAL_Y = -4;
 
 interface CameraRigProps {
   cameraDistance: number;

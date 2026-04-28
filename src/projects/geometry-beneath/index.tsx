@@ -3,7 +3,101 @@ import type P5 from 'p5';
 import type { ProjectComponentProps } from '../../types/project';
 import styles from './GeometryBeneath.module.css';
 
-type Mode = 'branching' | 'spiral' | 'tiling';
+type Mode = 'branching' | 'spiral' | 'tiling' | 'mandelbrot';
+
+// ---------------------------------------------------------------------------
+// Cosine-palette gradient presets: color(t) = a + b * cos(2π(c*t + d))
+// Each channel (R, G, B) has its own [a, b, c, d] tuple.
+// ---------------------------------------------------------------------------
+interface CosineCoeffs {
+  a: [number, number, number];
+  b: [number, number, number];
+  c: [number, number, number];
+  d: [number, number, number];
+}
+
+interface GradientPreset {
+  label: string;
+  coeffs: CosineCoeffs;
+}
+
+const GRADIENT_PRESETS: Record<string, GradientPreset> = {
+  iridescent: {
+    label: 'Iridescent',
+    coeffs: {
+      a: [0.62, 0.54, 0.78],
+      b: [0.28, 0.22, 0.18],
+      c: [0.72, 0.72, 0.72],
+      d: [0.00, 0.35, 0.58],
+    },
+  },
+  ember: {
+    label: 'Ember',
+    coeffs: {
+      a: [0.70, 0.30, 0.20],
+      b: [0.30, 0.25, 0.15],
+      c: [0.80, 0.80, 0.50],
+      d: [0.00, 0.15, 0.20],
+    },
+  },
+  aurora: {
+    label: 'Aurora',
+    coeffs: {
+      a: [0.30, 0.60, 0.55],
+      b: [0.25, 0.30, 0.35],
+      c: [0.90, 0.70, 0.80],
+      d: [0.65, 0.00, 0.30],
+    },
+  },
+  sakura: {
+    label: 'Sakura',
+    coeffs: {
+      a: [0.75, 0.48, 0.58],
+      b: [0.22, 0.18, 0.20],
+      c: [0.60, 0.60, 0.60],
+      d: [0.00, 0.50, 0.35],
+    },
+  },
+  ocean: {
+    label: 'Ocean',
+    coeffs: {
+      a: [0.22, 0.46, 0.70],
+      b: [0.18, 0.28, 0.22],
+      c: [0.75, 0.75, 0.75],
+      d: [0.50, 0.20, 0.00],
+    },
+  },
+  neon: {
+    label: 'Neon',
+    coeffs: {
+      a: [0.50, 0.50, 0.50],
+      b: [0.50, 0.50, 0.50],
+      c: [1.00, 1.00, 1.00],
+      d: [0.00, 0.33, 0.67],
+    },
+  },
+  gold: {
+    label: 'Gold',
+    coeffs: {
+      a: [0.72, 0.58, 0.30],
+      b: [0.24, 0.20, 0.15],
+      c: [0.55, 0.55, 0.40],
+      d: [0.00, 0.10, 0.30],
+    },
+  },
+};
+
+const GRADIENT_KEYS = Object.keys(GRADIENT_PRESETS);
+
+function randomCoeffs(): CosineCoeffs {
+  const r = () => Math.random();
+  return {
+    a: [0.35 + r() * 0.45, 0.35 + r() * 0.45, 0.35 + r() * 0.45],
+    b: [0.15 + r() * 0.40, 0.15 + r() * 0.40, 0.15 + r() * 0.40],
+    c: [0.50 + r() * 0.60, 0.50 + r() * 0.60, 0.50 + r() * 0.60],
+    d: [r(), r(), r()],
+  };
+}
 
 interface BranchingControls {
   depth: number;
@@ -29,17 +123,31 @@ interface TilingControls {
   seed: number;
 }
 
+interface MandelbrotControls {
+  centerX: number;
+  centerY: number;
+  zoom: number;
+  maxIter: number;
+  escapeR: number;
+  contrast: number;
+}
+
 interface Controls {
   mode: Mode;
   iridescent: boolean;
+  gradient: string;
+  gradientCoeffs: CosineCoeffs;
   branching: BranchingControls;
   spiral: SpiralControls;
   tiling: TilingControls;
+  mandelbrot: MandelbrotControls;
 }
 
 const DEFAULTS: Controls = {
-  mode: 'branching',
+  mode: 'tiling',
   iridescent: true,
+  gradient: 'iridescent',
+  gradientCoeffs: GRADIENT_PRESETS.iridescent.coeffs,
   branching: {
     depth: 8,
     angleDeg: 24,
@@ -61,27 +169,68 @@ const DEFAULTS: Controls = {
     fillBrightness: 14,
     seed: 1,
   },
+  mandelbrot: {
+    centerX: -0.7,
+    centerY: 0,
+    zoom: 1,
+    maxIter: 180,
+    escapeR: 4,
+    contrast: 1,
+  },
 };
 
 const TAGLINES: Record<Mode, string> = {
   branching: 'Repetition across scale — a small branch looks like the whole tree.',
   spiral: 'Growth and proportion — slide the angle to see why nature settled on 137.5°.',
   tiling: 'Symmetry and tiling — honeycombs, dried mud, and cells use the same packing.',
+  mandelbrot: 'Self-similarity from one rule — z ↦ z² + c, repeated forever.',
 };
 
 const SEGMENT_CAP = 60_000;
 
 // ---------------------------------------------------------------------------
-// Iridescent color — smooth cosine-palette gradient (violet ↔ teal ↔ blush)
+// Offscreen glow buffer — draw halo strokes here, composite blurred in one
+// GPU-accelerated drawImage call instead of per-segment shadowBlur.
+// ---------------------------------------------------------------------------
+let _glowCanvas: HTMLCanvasElement | null = null;
+let _glowCtx: CanvasRenderingContext2D | null = null;
+
+function getGlowBuffer(w: number, h: number): CanvasRenderingContext2D {
+  if (!_glowCanvas || _glowCanvas.width !== w || _glowCanvas.height !== h) {
+    _glowCanvas = document.createElement('canvas');
+    _glowCanvas.width = w;
+    _glowCanvas.height = h;
+    _glowCtx = _glowCanvas.getContext('2d')!;
+  } else {
+    _glowCtx!.clearRect(0, 0, w, h);
+  }
+  return _glowCtx!;
+}
+
+function compositeGlow(
+  ctx: CanvasRenderingContext2D,
+  blurPx: number = 12,
+) {
+  if (!_glowCanvas) return;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.filter = `blur(${blurPx}px)`;
+  ctx.drawImage(_glowCanvas, 0, 0);
+  ctx.filter = 'none';
+  ctx.restore();
+}
+
+// ---------------------------------------------------------------------------
+// Cosine-palette color — driven by the active gradient preset coefficients
 // ---------------------------------------------------------------------------
 
-function iridescentColor(
+function paletteColor(
   px: number,
   py: number,
   w: number,
   h: number,
+  co: CosineCoeffs,
 ): [number, number, number] {
-  // Normalised position with gentle spatial variation
   const nx = px / w;
   const ny = py / h;
   const t =
@@ -90,12 +239,10 @@ function iridescentColor(
     Math.sin(nx * 3.1) * 0.08 +
     Math.sin(ny * 2.7) * 0.06;
 
-  // Cosine palette: color(t) = a + b * cos(2π(c*t + d))
-  // Tuned for a narrow violet → teal → warm-blush band
   const TAU = Math.PI * 2;
-  const r = 0.62 + 0.28 * Math.cos(TAU * (0.72 * t + 0.00));
-  const g = 0.54 + 0.22 * Math.cos(TAU * (0.72 * t + 0.35));
-  const b = 0.78 + 0.18 * Math.cos(TAU * (0.72 * t + 0.58));
+  const r = co.a[0] + co.b[0] * Math.cos(TAU * (co.c[0] * t + co.d[0]));
+  const g = co.a[1] + co.b[1] * Math.cos(TAU * (co.c[1] * t + co.d[1]));
+  const b = co.a[2] + co.b[2] * Math.cos(TAU * (co.c[2] * t + co.d[2]));
 
   return [
     Math.round(Math.max(0, Math.min(1, r)) * 255),
@@ -126,6 +273,7 @@ function drawBranching(
   height: number,
   c: BranchingControls,
   iridescent: boolean,
+  coeffs: CosineCoeffs,
 ): BranchStats {
   p.background(8, 9, 12);
   const stats: BranchStats = { segments: 0, capped: false };
@@ -160,7 +308,7 @@ function drawBranching(
     if (iridescent) {
       const mx = (x + x2) * 0.5;
       const my = (y + y2) * 0.5;
-      [sr, sg, sb] = iridescentColor(mx, my, width, height);
+      [sr, sg, sb] = paletteColor(mx, my, width, height, coeffs);
     } else {
       sr = 232; sg = 234; sb = 240;
     }
@@ -181,31 +329,27 @@ function drawBranching(
   recur(startX, startY, -Math.PI / 2, initialLength, c.depth);
 
   if (iridescent) {
-    // Pass 1: wide soft halo with canvas shadowBlur
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
+    // Pass 1: halo strokes → offscreen buffer, composite blurred in one call
+    const gctx = getGlowBuffer(width, height);
+    gctx.globalCompositeOperation = 'lighter';
+    gctx.lineCap = 'round';
     for (const seg of segments) {
-      const color = `rgba(${seg.r | 0},${seg.g | 0},${seg.b | 0},0.25)`;
-      ctx.shadowColor = `rgb(${seg.r | 0},${seg.g | 0},${seg.b | 0})`;
-      ctx.shadowBlur = 18 + seg.sw * 4;
-      ctx.strokeStyle = color;
-      ctx.lineWidth = seg.sw * 3;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(seg.x1, seg.y1);
-      ctx.lineTo(seg.x2, seg.y2);
-      ctx.stroke();
+      gctx.strokeStyle = `rgba(${seg.r | 0},${seg.g | 0},${seg.b | 0},0.35)`;
+      gctx.lineWidth = seg.sw * 3;
+      gctx.beginPath();
+      gctx.moveTo(seg.x1, seg.y1);
+      gctx.lineTo(seg.x2, seg.y2);
+      gctx.stroke();
     }
-    ctx.restore();
+    compositeGlow(ctx, 14);
 
     // Pass 2: bright narrow core
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    ctx.shadowBlur = 0;
+    ctx.lineCap = 'round';
     for (const seg of segments) {
       ctx.strokeStyle = `rgba(${seg.r | 0},${seg.g | 0},${seg.b | 0},0.9)`;
       ctx.lineWidth = seg.sw;
-      ctx.lineCap = 'round';
       ctx.beginPath();
       ctx.moveTo(seg.x1, seg.y1);
       ctx.lineTo(seg.x2, seg.y2);
@@ -223,7 +367,7 @@ function drawBranching(
   return stats;
 }
 
-function drawSpiral(p: P5, width: number, height: number, c: SpiralControls, iridescent: boolean) {
+function drawSpiral(p: P5, width: number, height: number, c: SpiralControls, iridescent: boolean, coeffs: CosineCoeffs) {
   p.background(8, 9, 12);
   const cx = width / 2;
   const cy = height / 2;
@@ -239,35 +383,31 @@ function drawSpiral(p: P5, width: number, height: number, c: SpiralControls, iri
   if (iridescent) {
     const ctx = (p.drawingContext as CanvasRenderingContext2D);
 
-    // Pass 1: soft halo
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
+    // Pass 1: halo → offscreen buffer, composite blurred in one call
+    const gctx = getGlowBuffer(width, height);
+    gctx.globalCompositeOperation = 'lighter';
     for (let i = 0; i < c.count; i++) {
       const r = c.scale * Math.sqrt(i) * fit;
       const a = i * radians;
       const x = cx + Math.cos(a) * r;
       const y = cy + Math.sin(a) * r;
-      const [cr, cg, cb] = iridescentColor(x, y, width, height);
-      const color = `rgb(${cr | 0},${cg | 0},${cb | 0})`;
-      ctx.shadowColor = color;
-      ctx.shadowBlur = 12 + c.dotSize * 2;
-      ctx.fillStyle = `rgba(${cr | 0},${cg | 0},${cb | 0},0.3)`;
-      ctx.beginPath();
-      ctx.arc(x, y, c.dotSize * 1.5, 0, Math.PI * 2);
-      ctx.fill();
+      const [cr, cg, cb] = paletteColor(x, y, width, height, coeffs);
+      gctx.fillStyle = `rgba(${cr | 0},${cg | 0},${cb | 0},0.4)`;
+      gctx.beginPath();
+      gctx.arc(x, y, c.dotSize * 1.5, 0, Math.PI * 2);
+      gctx.fill();
     }
-    ctx.restore();
+    compositeGlow(ctx, 10);
 
     // Pass 2: bright core
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    ctx.shadowBlur = 0;
     for (let i = 0; i < c.count; i++) {
       const r = c.scale * Math.sqrt(i) * fit;
       const a = i * radians;
       const x = cx + Math.cos(a) * r;
       const y = cy + Math.sin(a) * r;
-      const [cr, cg, cb] = iridescentColor(x, y, width, height);
+      const [cr, cg, cb] = paletteColor(x, y, width, height, coeffs);
       ctx.fillStyle = `rgba(${cr | 0},${cg | 0},${cb | 0},0.95)`;
       ctx.beginPath();
       ctx.arc(x, y, c.dotSize * 0.5, 0, Math.PI * 2);
@@ -287,7 +427,7 @@ function drawSpiral(p: P5, width: number, height: number, c: SpiralControls, iri
   }
 }
 
-function drawTiling(p: P5, width: number, height: number, c: TilingControls, iridescent: boolean) {
+function drawTiling(p: P5, width: number, height: number, c: TilingControls, iridescent: boolean, coeffs: CosineCoeffs) {
   const fillVal = Math.max(0, Math.min(60, c.fillBrightness));
   p.background(8, 9, 12);
 
@@ -332,7 +472,7 @@ function drawTiling(p: P5, width: number, height: number, c: TilingControls, iri
 
       let er: number, eg: number, eb: number;
       if (iridescent) {
-        [er, eg, eb] = iridescentColor(cx, cy, width, height);
+        [er, eg, eb] = paletteColor(cx, cy, width, height, coeffs);
       } else {
         er = 167; eg = 139; eb = 250;
       }
@@ -353,30 +493,26 @@ function drawTiling(p: P5, width: number, height: number, c: TilingControls, iri
     const ctx = (p.drawingContext as CanvasRenderingContext2D);
     const alpha = Math.round(c.edgeAlpha * 255);
 
-    // Pass 1: wide soft glow edges
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
+    // Pass 1: glow edges → offscreen buffer, composite blurred in one call
+    const gctx = getGlowBuffer(width, height);
+    gctx.globalCompositeOperation = 'lighter';
     for (const hex of hexes) {
-      const color = `rgb(${hex.er | 0},${hex.eg | 0},${hex.eb | 0})`;
-      ctx.shadowColor = color;
-      ctx.shadowBlur = 14;
-      ctx.strokeStyle = `rgba(${hex.er | 0},${hex.eg | 0},${hex.eb | 0},${(alpha / 255 * 0.35).toFixed(3)})`;
-      ctx.lineWidth = 3;
-      ctx.beginPath();
+      gctx.strokeStyle = `rgba(${hex.er | 0},${hex.eg | 0},${hex.eb | 0},${(alpha / 255 * 0.45).toFixed(3)})`;
+      gctx.lineWidth = 3;
+      gctx.beginPath();
       for (let k = 0; k < hex.verts.length; k++) {
         const [vx, vy] = hex.verts[k];
-        if (k === 0) ctx.moveTo(vx, vy);
-        else ctx.lineTo(vx, vy);
+        if (k === 0) gctx.moveTo(vx, vy);
+        else gctx.lineTo(vx, vy);
       }
-      ctx.closePath();
-      ctx.stroke();
+      gctx.closePath();
+      gctx.stroke();
     }
-    ctx.restore();
+    compositeGlow(ctx, 12);
 
     // Pass 2: bright narrow core
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    ctx.shadowBlur = 0;
     for (const hex of hexes) {
       ctx.strokeStyle = `rgba(${hex.er | 0},${hex.eg | 0},${hex.eb | 0},${(alpha / 255 * 0.85).toFixed(3)})`;
       ctx.lineWidth = 1;
@@ -400,6 +536,131 @@ function drawTiling(p: P5, width: number, height: number, c: TilingControls, iri
       p.endShape(p.CLOSE);
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// Mandelbrot — CPU escape-time renderer drawn into an offscreen ImageData,
+// then blitted via drawImage. Uses adaptive sampling on small viewports.
+// ---------------------------------------------------------------------------
+let _mbCanvas: HTMLCanvasElement | null = null;
+let _mbCtx: CanvasRenderingContext2D | null = null;
+
+function getMandelbrotBuffer(w: number, h: number): {
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+} {
+  if (!_mbCanvas || _mbCanvas.width !== w || _mbCanvas.height !== h) {
+    _mbCanvas = document.createElement('canvas');
+    _mbCanvas.width = w;
+    _mbCanvas.height = h;
+    _mbCtx = _mbCanvas.getContext('2d')!;
+  }
+  return { canvas: _mbCanvas, ctx: _mbCtx! };
+}
+
+function drawMandelbrot(
+  p: P5,
+  width: number,
+  height: number,
+  c: MandelbrotControls,
+  iridescent: boolean,
+  coeffs: CosineCoeffs,
+) {
+  p.background(8, 9, 12);
+
+  // Render at full CSS-pixel resolution for crisp detail. Cap the long edge
+  // only on very large viewports to keep CPU work bounded.
+  const maxEdge = Math.max(width, height);
+  const cap = 1600;
+  const scale = maxEdge > cap ? cap / maxEdge : 1;
+  const rw = Math.max(2, Math.floor(width * scale));
+  const rh = Math.max(2, Math.floor(height * scale));
+
+  const { canvas: buf, ctx: bctx } = getMandelbrotBuffer(rw, rh);
+  const img = bctx.createImageData(rw, rh);
+  const data = img.data;
+
+  // Map pixel space to complex plane: keep aspect, base view ~3.5 wide at zoom=1.
+  const baseSpan = 3.5;
+  const aspect = rw / rh;
+  const spanX = baseSpan / c.zoom;
+  const spanY = spanX / aspect;
+  const x0 = c.centerX - spanX / 2;
+  const y0 = c.centerY - spanY / 2;
+
+  const maxIter = Math.max(20, Math.floor(c.maxIter));
+  const escapeSq = Math.max(2, c.escapeR) * Math.max(2, c.escapeR);
+  const logEscape = Math.log(Math.max(2, c.escapeR));
+  const contrast = Math.max(0.2, c.contrast);
+
+  // 1D cosine palette: color depends purely on smooth iteration count, so
+  // bands follow the fractal instead of being smeared across the screen.
+  const TAU = Math.PI * 2;
+  const palette1D = (t: number): [number, number, number] => {
+    const r = coeffs.a[0] + coeffs.b[0] * Math.cos(TAU * (coeffs.c[0] * t + coeffs.d[0]));
+    const g = coeffs.a[1] + coeffs.b[1] * Math.cos(TAU * (coeffs.c[1] * t + coeffs.d[1]));
+    const b = coeffs.a[2] + coeffs.b[2] * Math.cos(TAU * (coeffs.c[2] * t + coeffs.d[2]));
+    return [
+      Math.round(Math.max(0, Math.min(1, r)) * 255),
+      Math.round(Math.max(0, Math.min(1, g)) * 255),
+      Math.round(Math.max(0, Math.min(1, b)) * 255),
+    ];
+  };
+
+  for (let py = 0; py < rh; py++) {
+    const ci = y0 + (py / rh) * spanY;
+    for (let px = 0; px < rw; px++) {
+      const cr = x0 + (px / rw) * spanX;
+      let zr = 0;
+      let zi = 0;
+      let iter = 0;
+      let zr2 = 0;
+      let zi2 = 0;
+      while (iter < maxIter && zr2 + zi2 <= escapeSq) {
+        zi = 2 * zr * zi + ci;
+        zr = zr2 - zi2 + cr;
+        zr2 = zr * zr;
+        zi2 = zi * zi;
+        iter++;
+      }
+      const idx = (py * rw + px) * 4;
+      if (iter >= maxIter) {
+        data[idx] = 6;
+        data[idx + 1] = 7;
+        data[idx + 2] = 12;
+        data[idx + 3] = 255;
+      } else {
+        // Smooth iteration count (continuous coloring).
+        const log_zn = Math.log(zr2 + zi2) * 0.5;
+        const nu = Math.log(log_zn / logEscape) / Math.LN2;
+        const smooth = iter + 1 - nu;
+        // sqrt compresses the fast-escape outer band so detail is more even.
+        let t = Math.sqrt(Math.max(0, smooth) / maxIter) * contrast;
+        t = t - Math.floor(t); // wrap into [0,1) for richer banding
+        if (iridescent) {
+          const [r, g, b] = palette1D(t);
+          data[idx] = r;
+          data[idx + 1] = g;
+          data[idx + 2] = b;
+          data[idx + 3] = 255;
+        } else {
+          const v = Math.round(255 * Math.pow(t, 0.7));
+          data[idx] = v;
+          data[idx + 1] = v;
+          data[idx + 2] = v;
+          data[idx + 3] = 255;
+        }
+      }
+    }
+  }
+  bctx.putImageData(img, 0, 0);
+
+  const ctx = p.drawingContext as CanvasRenderingContext2D;
+  ctx.save();
+  ctx.imageSmoothingEnabled = scale < 1;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(buf, 0, 0, width, height);
+  ctx.restore();
 }
 
 interface SliderProps {
@@ -441,10 +702,21 @@ function GeometryBeneath({ width, height }: ProjectComponentProps) {
   const sizeRef = useRef({ width, height });
   const [branchStats, setBranchStats] = useState<BranchStats>({ segments: 0, capped: false });
   const lastReportedRef = useRef<BranchStats>({ segments: 0, capped: false });
+  const rafRef = useRef(0);
 
   useEffect(() => {
     controlsRef.current = controls;
-    sketchRef.current?.redraw();
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = 0;
+      sketchRef.current?.redraw();
+    });
+    return () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = 0;
+      }
+    };
   }, [controls]);
 
   useEffect(() => {
@@ -473,16 +745,18 @@ function GeometryBeneath({ width, height }: ProjectComponentProps) {
           const { width: w, height: h } = sizeRef.current;
           const c = controlsRef.current;
           if (c.mode === 'branching') {
-            const stats = drawBranching(p, w, h, c.branching, c.iridescent);
+            const stats = drawBranching(p, w, h, c.branching, c.iridescent, c.gradientCoeffs);
             const last = lastReportedRef.current;
             if (stats.segments !== last.segments || stats.capped !== last.capped) {
               lastReportedRef.current = stats;
               setBranchStats(stats);
             }
           } else if (c.mode === 'spiral') {
-            drawSpiral(p, w, h, c.spiral, c.iridescent);
+            drawSpiral(p, w, h, c.spiral, c.iridescent, c.gradientCoeffs);
+          } else if (c.mode === 'tiling') {
+            drawTiling(p, w, h, c.tiling, c.iridescent, c.gradientCoeffs);
           } else {
-            drawTiling(p, w, h, c.tiling, c.iridescent);
+            drawMandelbrot(p, w, h, c.mandelbrot, c.iridescent, c.gradientCoeffs);
           }
         };
       };
@@ -520,6 +794,24 @@ function GeometryBeneath({ width, height }: ProjectComponentProps) {
         next.branching = { ...prev.branching, seed };
       } else if (prev.mode === 'tiling') {
         next.tiling = { ...prev.tiling, seed };
+      } else if (prev.mode === 'mandelbrot') {
+        // Pick a random interesting point near the boundary of the set.
+        const POIs: Array<[number, number, number]> = [
+          [-0.743643887037151, 0.131825904205330, 800],
+          [-0.10109636384562, 0.95628651080914, 200],
+          [-1.25066, 0.02012, 200],
+          [-0.7269, 0.1889, 300],
+          [0.28693186889, 0.014286693, 400],
+          [-0.748, 0.1, 80],
+          [-1.7497219, 0, 200],
+        ];
+        const [cx, cy, z] = POIs[Math.floor(Math.random() * POIs.length)];
+        next.mandelbrot = {
+          ...prev.mandelbrot,
+          centerX: cx,
+          centerY: cy,
+          zoom: z,
+        };
       } else {
         next.spiral = {
           ...prev.spiral,
@@ -553,6 +845,7 @@ function GeometryBeneath({ width, height }: ProjectComponentProps) {
             <option value="branching">1 — Repetition (branching)</option>
             <option value="spiral">2 — Growth (spiral)</option>
             <option value="tiling">3 — Tiling (honeycomb)</option>
+            <option value="mandelbrot">4 — Self-similarity (Mandelbrot)</option>
           </select>
         </section>
 
@@ -569,6 +862,57 @@ function GeometryBeneath({ width, height }: ProjectComponentProps) {
             />
           </label>
         </section>
+
+        {controls.iridescent && (
+          <section className={styles.section}>
+            <p className={styles.sectionTitle}>Gradient</p>
+            <div className={styles.row}>
+              <select
+                className={styles.select}
+                value={controls.gradient}
+                onChange={(e) => {
+                  const key = e.target.value;
+                  if (key === 'random') {
+                    setControls((prev) => ({
+                      ...prev,
+                      gradient: 'random',
+                      gradientCoeffs: randomCoeffs(),
+                    }));
+                  } else {
+                    setControls((prev) => ({
+                      ...prev,
+                      gradient: key,
+                      gradientCoeffs: GRADIENT_PRESETS[key].coeffs,
+                    }));
+                  }
+                }}
+                aria-label="Gradient preset"
+              >
+                {GRADIENT_KEYS.map((k) => (
+                  <option key={k} value={k}>
+                    {GRADIENT_PRESETS[k].label}
+                  </option>
+                ))}
+                <option value="random">Random</option>
+              </select>
+              {controls.gradient === 'random' && (
+                <button
+                  className={styles.button}
+                  type="button"
+                  onClick={() =>
+                    setControls((prev) => ({
+                      ...prev,
+                      gradientCoeffs: randomCoeffs(),
+                    }))
+                  }
+                  style={{ minWidth: '3.2rem' }}
+                >
+                  ↻
+                </button>
+              )}
+            </div>
+          </section>
+        )}
 
         {controls.mode === 'branching' && (
           <section className={styles.section}>
@@ -725,6 +1069,78 @@ function GeometryBeneath({ width, height }: ProjectComponentProps) {
                 setControls((p) => ({ ...p, tiling: { ...p.tiling, fillBrightness: v } }))
               }
             />
+          </section>
+        )}
+
+        {controls.mode === 'mandelbrot' && (
+          <section className={styles.section}>
+            <p className={styles.sectionTitle}>Mandelbrot</p>
+            <SliderControl
+              label="Zoom"
+              min={0.5}
+              max={2000}
+              step={0.5}
+              value={controls.mandelbrot.zoom}
+              onChange={(v) =>
+                setControls((p) => ({ ...p, mandelbrot: { ...p.mandelbrot, zoom: v } }))
+              }
+              format={(v) => `${v.toFixed(1)}×`}
+            />
+            <SliderControl
+              label="Center X"
+              min={-2}
+              max={1}
+              step={0.0001}
+              value={controls.mandelbrot.centerX}
+              onChange={(v) =>
+                setControls((p) => ({ ...p, mandelbrot: { ...p.mandelbrot, centerX: v } }))
+              }
+              format={(v) => v.toFixed(4)}
+            />
+            <SliderControl
+              label="Center Y"
+              min={-1.2}
+              max={1.2}
+              step={0.0001}
+              value={controls.mandelbrot.centerY}
+              onChange={(v) =>
+                setControls((p) => ({ ...p, mandelbrot: { ...p.mandelbrot, centerY: v } }))
+              }
+              format={(v) => v.toFixed(4)}
+            />
+            <SliderControl
+              label="Max iterations"
+              min={40}
+              max={800}
+              step={10}
+              value={controls.mandelbrot.maxIter}
+              onChange={(v) =>
+                setControls((p) => ({ ...p, mandelbrot: { ...p.mandelbrot, maxIter: v } }))
+              }
+            />
+            <SliderControl
+              label="Escape radius"
+              min={2}
+              max={32}
+              step={1}
+              value={controls.mandelbrot.escapeR}
+              onChange={(v) =>
+                setControls((p) => ({ ...p, mandelbrot: { ...p.mandelbrot, escapeR: v } }))
+              }
+            />
+            <SliderControl
+              label="Contrast"
+              min={0.5}
+              max={6}
+              step={0.1}
+              value={controls.mandelbrot.contrast}
+              onChange={(v) =>
+                setControls((p) => ({ ...p, mandelbrot: { ...p.mandelbrot, contrast: v } }))
+              }
+            />
+            <p className={styles.note}>
+              One rule, applied forever: z ↦ z² + c. Zoom in to see the same forms repeat at every scale.
+            </p>
           </section>
         )}
 

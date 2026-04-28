@@ -364,7 +364,7 @@ uniform vec3 uColor;
 varying float vEdgeOrder;
 varying vec3 vWorldPos;
 void main() {
-  if (vEdgeOrder > uProgress) discard;
+  if (uProgress < 0.005 || vEdgeOrder > uProgress) discard;
   // Drawing head glow — tight gaussian at the frontier.
   float headDist = uProgress - vEdgeOrder;
   float head = exp(-headDist * headDist * 300.0);
@@ -537,7 +537,7 @@ function Solids({ controller, data, strokeDimRef }: SolidsProps) {
   const layout = useMemo(() => {
     return SOLID_KINDS.map((kind, i) => {
       const a = (i / SOLID_KINDS.length) * Math.PI * 2 - Math.PI / 2;
-      const r = 1.6;
+      const r = 2.4;
       return {
         kind,
         position: [r * Math.cos(a), r * Math.sin(a), 0.4] as [number, number, number],

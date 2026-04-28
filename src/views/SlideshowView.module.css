@@ -1,7 +1,15 @@
+.frame {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-height: 100dvh;
+}
+
 .deck {
   flex: 1;
   min-height: 0;
-  height: 100dvh;
+  height: 100%;
+  scroll-padding-bottom: 1.5rem;
   overflow-y: auto;
   overflow-x: hidden;
   scroll-snap-type: y mandatory;
@@ -43,20 +51,14 @@
 
 /* Top progress bar — fills as you advance through the deck. */
 .progress {
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
   right: 0;
   height: 2px;
-  z-index: 50;
+  z-index: 1;
   background: rgba(255, 255, 255, 0.06);
   pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.progress[data-visible='true'] {
-  opacity: 1;
 }
 
 .progressFill {
@@ -68,47 +70,39 @@
   transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-/* Bottom-center nav pill: prev | title + counter | next.
-   Auto-hides after inactivity. */
-.nav {
-  position: fixed;
-  left: 50%;
-  bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
-  transform: translate(-50%, 0);
-  z-index: 50;
-  display: flex;
-  flex-direction: row;
-  align-items: stretch;
-  gap: 0.125rem;
-  padding: 0.25rem;
-  border-radius: 999px;
-  background: rgba(10, 10, 10, 0.65);
+.navWrap {
+  position: relative;
+  flex-shrink: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(10, 10, 10, 0.9);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  max-width: calc(100vw - 2rem);
-  opacity: 0;
-  transform: translate(-50%, 0.5rem);
-  transition: opacity 0.25s ease, transform 0.25s ease;
-  pointer-events: none;
 }
 
-.nav[data-visible='true'] {
-  opacity: 1;
-  transform: translate(-50%, 0);
-  pointer-events: auto;
+/* Dedicated bottom footer nav: always visible and touch-friendly. */
+.nav {
+  display: flex;
+  justify-content: center;
+  padding: 0.625rem 0.75rem calc(0.625rem + env(safe-area-inset-bottom, 0px));
+}
+
+.navCluster {
+  width: min(100%, 28rem);
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr) 3rem;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .navBtn {
-  flex-shrink: 0;
-  min-width: 44px;
-  min-height: 44px;
+  width: 3rem;
+  height: 3rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 999px;
-  background: transparent;
-  border: none;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   color: var(--color-text);
   cursor: pointer;
   padding: 0;
@@ -130,14 +124,19 @@
   background: rgba(255, 255, 255, 0.14);
 }
 
+.navBtn:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
 .navLabel {
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  padding: 0 0.875rem;
+  padding: 0 0.5rem;
   min-height: 44px;
-  width: clamp(10rem, 50vw, 18rem);
+  min-width: 0;
   gap: 0.125rem;
   line-height: 1.1;
 }
@@ -163,10 +162,23 @@
   letter-spacing: 0.05em;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .progress,
-  .progressFill,
+@media (min-width: 768px) {
+  .deck {
+    scroll-padding-bottom: 2rem;
+  }
+
   .nav {
+    padding-top: 0.75rem;
+    padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .navCluster {
+    width: clamp(20rem, 46vw, 32rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progressFill {
     transition: none;
   }
 }

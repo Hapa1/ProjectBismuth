@@ -44,8 +44,17 @@ export interface ExhibitDef {
   imageAlt: string;
   /** CC attribution metadata for the photograph. */
   credit: Credit;
-  /** Slider definitions for this exhibit. */
+  /** Slider definitions for this exhibit. Only used when `render` is provided. */
   controls: ControlDef[];
-  /** Render function for the 3D scene. Will be wrapped in a drei <View>. */
-  render: (props: SceneProps) => ReactElement;
+  /**
+   * Render function for a Three.js scene. Runs inside the shared exhibit Canvas.
+   * Mutually exclusive with `projectId`.
+   */
+  render?: (props: SceneProps) => ReactElement;
+  /**
+   * Project id from the project registry. When set, the full project component
+   * is rendered via SlideDemo instead of the shared Canvas + render function.
+   * The controls panel is hidden; the project supplies its own UI.
+   */
+  projectId?: string;
 }

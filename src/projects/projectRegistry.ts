@@ -10,17 +10,6 @@ interface RegistryEntry {
 export const projectRegistry: RegistryEntry[] = [
   {
     meta: {
-      id: 'bismuth',
-      title: 'Bismuth Simulator',
-      year: 2026,
-      renderer: 'three',
-      description: 'Recursive iridescent bismuth crystal growth.',
-      tags: ['three', 'shader', 'recursion'],
-    },
-    load: () => import('./bismuth'),
-  },
-  {
-    meta: {
       id: 'expanse',
       title: 'Expanse',
       year: 2026,

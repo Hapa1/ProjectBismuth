@@ -31,8 +31,6 @@ export function SlideshowView({ registry = defaultSlideRegistry }: SlideshowView
   const observerRef = useRef<IntersectionObserver | null>(null);
   const visibilityRef = useRef(new Map<string, number>());
   const [activeId, setActiveId] = useState<string>(registry[0]?.meta.id ?? '');
-  const [chromeVisible, setChromeVisible] = useState(true);
-  const idleTimerRef = useRef<number | null>(null);
 
   // Lazy components, memoized by registry identity so identity is stable
   // for as long as the registry reference is stable.
@@ -183,36 +181,6 @@ export function SlideshowView({ registry = defaultSlideRegistry }: SlideshowView
     [slides, prefersReducedMotion],
   );
 
-  // Auto-hide chrome (progress bar + nav pill) after a period of inactivity.
-  // Any scroll, pointer, or key event reveals it again. Respect reduced motion
-  // by keeping it visible (no surprise reveals).
-  useEffect(() => {
-    if (prefersReducedMotion) {
-      setChromeVisible(true);
-      return;
-    }
-    const root = deckRef.current;
-    if (!root) return;
-    const reveal = () => {
-      setChromeVisible(true);
-      if (idleTimerRef.current) window.clearTimeout(idleTimerRef.current);
-      idleTimerRef.current = window.setTimeout(() => setChromeVisible(false), 2200);
-    };
-    reveal();
-    const opts: AddEventListenerOptions = { passive: true };
-    root.addEventListener('scroll', reveal, opts);
-    window.addEventListener('pointermove', reveal, opts);
-    window.addEventListener('pointerdown', reveal, opts);
-    window.addEventListener('keydown', reveal);
-    return () => {
-      root.removeEventListener('scroll', reveal);
-      window.removeEventListener('pointermove', reveal);
-      window.removeEventListener('pointerdown', reveal);
-      window.removeEventListener('keydown', reveal);
-      if (idleTimerRef.current) window.clearTimeout(idleTimerRef.current);
-    };
-  }, [prefersReducedMotion]);
-
   // Keyboard navigation
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -246,108 +214,110 @@ export function SlideshowView({ registry = defaultSlideRegistry }: SlideshowView
 
   return (
     <MDXProvider components={slideMdxComponents}>
-      <button
-        className={styles.menuBtn}
-        onClick={toggleSidebar}
-        aria-label="Open navigation"
-      >
-        ☰
-      </button>
+      <div className={styles.frame}>
+        <button
+          className={styles.menuBtn}
+          onClick={toggleSidebar}
+          aria-label="Open navigation"
+        >
+          ☰
+        </button>
 
-      <div ref={deckRef} className={styles.deck} aria-label="Presentation deck">
-        {slides.map(({ meta, Component }) => {
-          const isActive = meta.id === activeId;
+        <div ref={deckRef} className={styles.deck} aria-label="Presentation deck">
+          {slides.map(({ meta, Component }) => {
+            const isActive = meta.id === activeId;
+            return (
+              <SlideShell
+                key={meta.id}
+                id={meta.id}
+                isActive={isActive}
+                registerEl={registerEl}
+                theme={meta.theme}
+              >
+                <Suspense fallback={<StageLoader />}>
+                  <Component />
+                </Suspense>
+              </SlideShell>
+            );
+          })}
+        </div>
+
+        {slides.length > 1 && (() => {
+          const idx = Math.max(0, slides.findIndex((s) => s.meta.id === activeId));
+          const atFirst = idx <= 0;
+          const atLast = idx >= slides.length - 1;
+          const progress = slides.length > 1 ? idx / (slides.length - 1) : 0;
+          const activeTitle = slides[idx]?.meta.title ?? '';
           return (
-            <SlideShell
-              key={meta.id}
-              id={meta.id}
-              isActive={isActive}
-              registerEl={registerEl}
-              theme={meta.theme}
-            >
-              <Suspense fallback={<StageLoader />}>
-                <Component />
-              </Suspense>
-            </SlideShell>
-          );
-        })}
-      </div>
-
-      {slides.length > 1 && (() => {
-        const idx = Math.max(0, slides.findIndex((s) => s.meta.id === activeId));
-        const atFirst = idx <= 0;
-        const atLast = idx >= slides.length - 1;
-        const progress = slides.length > 1 ? idx / (slides.length - 1) : 0;
-        const activeTitle = slides[idx]?.meta.title ?? '';
-        return (
-          <>
-            <div
-              className={styles.progress}
-              data-visible={chromeVisible}
-              role="progressbar"
-              aria-label="Presentation progress"
-              aria-valuemin={0}
-              aria-valuemax={slides.length - 1}
-              aria-valuenow={idx}
-            >
+            <footer className={styles.navWrap}>
               <div
-                className={styles.progressFill}
-                style={{ transform: `scaleX(${progress})` }}
-              />
-            </div>
-            <nav
-              className={styles.nav}
-              data-visible={chromeVisible}
-              aria-label="Slide navigation"
-            >
-              <button
-                type="button"
-                className={styles.navBtn}
-                onClick={() => scrollToIndex(idx - 1)}
-                disabled={atFirst}
-                aria-label="Previous slide"
+                className={styles.progress}
+                role="progressbar"
+                aria-label="Presentation progress"
+                aria-valuemin={0}
+                aria-valuemax={slides.length - 1}
+                aria-valuenow={idx}
               >
-                <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-                  <path
-                    d="M15 6l-6 6 6 6"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
-              <div className={styles.navLabel}>
-                <span className={styles.navTitle} title={activeTitle}>
-                  {activeTitle}
-                </span>
-                <span className={styles.navCounter} aria-label={`Slide ${idx + 1} of ${slides.length}`}>
-                  {idx + 1} / {slides.length}
-                </span>
+                <div
+                  className={styles.progressFill}
+                  style={{ transform: `scaleX(${progress})` }}
+                />
               </div>
-              <button
-                type="button"
-                className={styles.navBtn}
-                onClick={() => scrollToIndex(idx + 1)}
-                disabled={atLast}
-                aria-label="Next slide"
+              <nav
+                className={styles.nav}
+                aria-label="Slide navigation"
               >
-                <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
-                  <path
-                    d="M9 6l6 6-6 6"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
-            </nav>
-          </>
-        );
-      })()}
+                <div className={styles.navCluster}>
+                  <button
+                    type="button"
+                    className={styles.navBtn}
+                    onClick={() => scrollToIndex(idx - 1)}
+                    disabled={atFirst}
+                    aria-label="Previous slide"
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                      <path
+                        d="M15 6l-6 6 6 6"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+                  <div className={styles.navLabel}>
+                    <span className={styles.navTitle} title={activeTitle}>
+                      {activeTitle}
+                    </span>
+                    <span className={styles.navCounter} aria-label={`Slide ${idx + 1} of ${slides.length}`}>
+                      {idx + 1} / {slides.length}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    className={styles.navBtn}
+                    onClick={() => scrollToIndex(idx + 1)}
+                    disabled={atLast}
+                    aria-label="Next slide"
+                  >
+                    <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
+                      <path
+                        d="M9 6l6 6-6 6"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              </nav>
+            </footer>
+          );
+        })()}
+      </div>
     </MDXProvider>
   );
 }

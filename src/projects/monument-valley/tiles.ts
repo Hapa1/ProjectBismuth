@@ -29,12 +29,18 @@ export type SocketTag =
   | 'air' // explicit empty-mid space — compatible with most things EXCEPT stair-high
   | 'floor'
   | 'dais'
-  | 'wall'
+  // Shaded walls: cube-front colours. Two cube faces only meet if same shade.
+  | 'wall-coral'
+  | 'wall-lavender'
+  | 'wall-sage'
   | 'open'
   | 'rail'
   | 'crenel'
   | 'stair-low'
   | 'stair-high';
+
+/** Visible body shade of a tile — used for stacking + adjacency rules. */
+export type Shade = 'coral' | 'lavender' | 'sage' | 'neutral';
 
 export type BaseTileId =
   | 'empty-ground'
@@ -56,10 +62,10 @@ export type BaseTileId =
   | 'column'
   | 'empty-top'
   | 'tower-crenel'
-  | 'balcony-curve'
-  | 'balcony-square'
-  | 'cantilever'
-  | 'wall-curve';
+  | 'wall-curve'
+  | 'top-cube-coral'
+  | 'top-cube-lavender'
+  | 'top-arch-coral';
 
 export interface BaseTile {
   id: BaseTileId;
@@ -76,6 +82,13 @@ export interface BaseTile {
   pairedSourceIndex?: number;
   sockets: [SocketTag, SocketTag, SocketTag, SocketTag];
   weight: number;
+  /** Visual body shade. Top-layer tiles will only place on a mid tile of the
+   *  same shade (see index.tsx top-layer cellBias). Defaults to 'neutral'. */
+  shade?: Shade;
+  /** Multiplicative size adjustment applied at draw time. Defaults to 1. Use
+   *  for sprites whose source art is naturally over- or under-sized relative
+   *  to neighbouring tiles. */
+  renderScale?: number;
   /**
    * Connectivity hint for the pathfinder. Defaults are inferred from layer/sockets
    * but explicit values document intent.
@@ -109,7 +122,8 @@ export const BASE_TILES: readonly BaseTile[] = [
     symmetry: 'X',
     sourceIndex: null,
     sockets: ['none', 'none', 'none', 'none'],
-    weight: 0.6,
+    // Weight 0 — ground is always a real floor tile; no air gaps.
+    weight: 0,
     walkable: false,
   },
   {
@@ -166,8 +180,9 @@ export const BASE_TILES: readonly BaseTile[] = [
     layer: 'mid',
     symmetry: 'X',
     sourceIndex: 1,
-    sockets: ['wall', 'wall', 'wall', 'wall'],
+    sockets: ['wall-coral', 'wall-coral', 'wall-coral', 'wall-coral'],
     weight: 1.4,
+    shade: 'coral',
     hasRoof: true,
   },
   {
@@ -177,8 +192,10 @@ export const BASE_TILES: readonly BaseTile[] = [
     symmetry: 'I',
     sourceIndex: 4,
     pairedSourceIndex: 6,
-    sockets: ['open', 'wall', 'open', 'wall'],
+    // 'open' on the arch faces accepts any shade so people can walk through.
+    sockets: ['open', 'wall-coral', 'open', 'wall-coral'],
     weight: 0.7,
+    shade: 'coral',
     portal: true,
     hasRoof: true,
   },
@@ -189,8 +206,9 @@ export const BASE_TILES: readonly BaseTile[] = [
     symmetry: 'I',
     sourceIndex: 5,
     pairedSourceIndex: 7,
-    sockets: ['wall', 'wall', 'wall', 'wall'],
+    sockets: ['wall-lavender', 'wall-lavender', 'wall-lavender', 'wall-lavender'],
     weight: 0.45,
+    shade: 'lavender',
     hasRoof: true,
   },
   {
@@ -199,8 +217,9 @@ export const BASE_TILES: readonly BaseTile[] = [
     // Only one source facing exists — keep a single rotation to avoid sheared art.
     symmetry: 'X',
     sourceIndex: 8,
-    sockets: ['wall', 'wall', 'air', 'air'],
+    sockets: ['wall-coral', 'wall-coral', 'air', 'air'],
     weight: 0.6,
+    shade: 'coral',
     hasRoof: true,
   },
   {
@@ -208,8 +227,9 @@ export const BASE_TILES: readonly BaseTile[] = [
     layer: 'mid',
     symmetry: 'X',
     sourceIndex: 9,
-    sockets: ['air', 'air', 'wall', 'wall'],
+    sockets: ['air', 'air', 'wall-coral', 'wall-coral'],
     weight: 0.6,
+    shade: 'coral',
     hasRoof: true,
   },
   {
@@ -217,8 +237,9 @@ export const BASE_TILES: readonly BaseTile[] = [
     layer: 'mid',
     symmetry: 'X',
     sourceIndex: 11,
-    sockets: ['air', 'air', 'wall', 'wall'],
+    sockets: ['air', 'air', 'wall-coral', 'wall-coral'],
     weight: 0.5,
+    shade: 'coral',
     hasRoof: true,
   },
   {
@@ -256,8 +277,12 @@ export const BASE_TILES: readonly BaseTile[] = [
     layer: 'mid',
     symmetry: 'X',
     sourceIndex: 14,
-    sockets: ['open', 'wall', 'open', 'wall'],
+    // Sage portal — walls on E/W are sage; openings on N/S are universal.
+    sockets: ['open', 'wall-sage', 'open', 'wall-sage'],
     weight: 0.55,
+    shade: 'sage',
+    // Source art reads visually larger than other 1-tile sprites; trim down.
+    renderScale: 0.85,
     portal: true,
   },
   {
@@ -286,40 +311,52 @@ export const BASE_TILES: readonly BaseTile[] = [
     sourceIndex: 18,
     sockets: ['crenel', 'crenel', 'crenel', 'crenel'],
     weight: 0.5,
-  },
-  {
-    id: 'balcony-curve',
-    layer: 'top',
-    symmetry: 'X',
-    sourceIndex: 17,
-    sockets: ['rail', 'rail', 'open', 'rail'],
-    weight: 0.4,
-  },
-  {
-    id: 'balcony-square',
-    layer: 'top',
-    symmetry: 'X',
-    sourceIndex: 20,
-    sockets: ['rail', 'rail', 'rail', 'rail'],
-    weight: 0.4,
-  },
-  {
-    id: 'cantilever',
-    layer: 'top',
-    // Two-source pair (16 + 19) → rotations 0 and 2.
-    symmetry: 'I',
-    sourceIndex: 16,
-    pairedSourceIndex: 19,
-    sockets: ['open', 'rail', 'rail', 'rail'],
-    weight: 0.45,
+    shade: 'lavender',
   },
   {
     id: 'wall-curve',
     layer: 'top',
     symmetry: 'X',
     sourceIndex: 21,
-    sockets: ['wall', 'open', 'wall', 'open'],
+    sockets: ['wall-coral', 'open', 'wall-coral', 'open'],
     weight: 0.3,
+    shade: 'coral',
+  },
+  // Stackable cubes — reuse the mid-layer cube sprites so a coral cube on top
+  // of a coral cube reads as a two-storey block. The shade-coupled top bias
+  // already enforces matching shades (or pairs with empty-top above non-roof
+  // mid cells), so these tiles only appear above another cube of their shade.
+  {
+    id: 'top-cube-coral',
+    layer: 'top',
+    symmetry: 'X',
+    sourceIndex: 1,
+    sockets: ['wall-coral', 'wall-coral', 'wall-coral', 'wall-coral'],
+    weight: 1.6,
+    shade: 'coral',
+    hasRoof: true,
+  },
+  {
+    id: 'top-cube-lavender',
+    layer: 'top',
+    symmetry: 'I',
+    sourceIndex: 5,
+    pairedSourceIndex: 7,
+    sockets: ['wall-lavender', 'wall-lavender', 'wall-lavender', 'wall-lavender'],
+    weight: 0.5,
+    shade: 'lavender',
+    hasRoof: true,
+  },
+  {
+    id: 'top-arch-coral',
+    layer: 'top',
+    symmetry: 'I',
+    sourceIndex: 4,
+    pairedSourceIndex: 6,
+    sockets: ['open', 'wall-coral', 'open', 'wall-coral'],
+    weight: 0.4,
+    shade: 'coral',
+    hasRoof: true,
   },
 ];
 
@@ -403,9 +440,17 @@ const COMPAT_PAIRS: ReadonlyArray<readonly [SocketTag, SocketTag]> = [
   ['floor', 'floor'],
   ['floor', 'dais'],
   ['dais', 'dais'],
-  ['wall', 'wall'],
-  ['wall', 'open'],
-  ['wall', 'air'],
+  // Shaded walls only meet a wall of identical shade. Each can also face air
+  // (gap between buildings) or open (arch opening).
+  ['wall-coral', 'wall-coral'],
+  ['wall-lavender', 'wall-lavender'],
+  ['wall-sage', 'wall-sage'],
+  ['wall-coral', 'air'],
+  ['wall-lavender', 'air'],
+  ['wall-sage', 'air'],
+  ['wall-coral', 'open'],
+  ['wall-lavender', 'open'],
+  ['wall-sage', 'open'],
   ['open', 'open'],
   ['open', 'air'],
   ['rail', 'rail'],
@@ -419,9 +464,10 @@ const COMPAT_PAIRS: ReadonlyArray<readonly [SocketTag, SocketTag]> = [
   ['stair-low', 'floor'],
   ['stair-low', 'open'],
   ['stair-low', 'air'],
-  // Stair HIGH end MUST abut a wall/open arch — never bare air. The omission
-  // of ['stair-high', 'air'] is the key constraint anchoring stairs to cubes.
-  ['stair-high', 'wall'],
+  // Stair HIGH end MUST abut a wall (any shade) or open arch — never bare air.
+  ['stair-high', 'wall-coral'],
+  ['stair-high', 'wall-lavender'],
+  ['stair-high', 'wall-sage'],
   ['stair-high', 'open'],
 ];
 

@@ -32,8 +32,8 @@ export interface Phase {
 // Geometry constants
 // ---------------------------------------------------------------------------
 
-export const BASE_RADIUS = 1.0;
-export const FRUIT_RADIUS = 0.5;
+export const BASE_RADIUS = 0.65;
+export const FRUIT_RADIUS = 0.32;
 
 const TAU = Math.PI * 2;
 
@@ -146,7 +146,7 @@ export const PHASE_COUNT = PHASES.length;
 // Ribbon builder
 // ---------------------------------------------------------------------------
 
-const RIBBON_WIDTH = 0.045;
+const RIBBON_WIDTH = 0.03;
 const CIRCLE_SEGMENTS = 96;
 
 interface PrimitiveMeta {

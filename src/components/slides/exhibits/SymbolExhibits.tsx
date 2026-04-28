@@ -3,6 +3,7 @@ import { Canvas } from '@react-three/fiber';
 import { EXHIBITS } from './registry';
 import { Slider } from '../../../lib/controls';
 import { useSlideContext } from '../SlideContext';
+import { SlideDemo } from '../SlideDemo';
 import styles from './SymbolExhibits.module.css';
 
 /**
@@ -87,7 +88,7 @@ export function SymbolExhibits() {
   return (
     <div className={styles.root}>
       <header className={styles.header}>
-        <span className={styles.eyebrow}>Slide 2 · The Question</span>
+        <span className={styles.eyebrow}>Slide 2 · Intro to Sacred Geometry</span>
         <h2 className={styles.title}>The same shapes, drawn by people who never met</h2>
       </header>
 
@@ -124,7 +125,10 @@ export function SymbolExhibits() {
         {/* Detail */}
         <section className={styles.detail} aria-live="polite">
           <div className={styles.viewport}>
-            {isActive && (
+            {isActive && active.projectId ? (
+              // Full project render — project supplies its own Canvas and controls UI.
+              <SlideDemo projectId={active.projectId} scrim={false} />
+            ) : isActive && active.render ? (
               <Canvas
                 key={active.id}
                 className={styles.canvas}
@@ -135,7 +139,7 @@ export function SymbolExhibits() {
                 <color attach="background" args={['#0a0a0a']} />
                 {active.render({ params })}
               </Canvas>
-            )}
+            ) : null}
 
               {!showImage && (
                 <button
@@ -148,7 +152,7 @@ export function SymbolExhibits() {
                 </button>
               )}
 
-              {!showControls && (
+              {!active.projectId && !showControls && active.controls.length > 0 && (
                 <button
                   type="button"
                   className={`${styles.reopenTab} ${styles.reopenRight}`}
@@ -193,7 +197,7 @@ export function SymbolExhibits() {
                 </figure>
               )}
 
-            {showControls && (
+            {!active.projectId && showControls && active.controls.length > 0 && (
               <div className={styles.controlsOverlay}>
                 <div className={styles.controlsHeader}>
                   <span className={styles.controlsTitle}>Controls</span>
