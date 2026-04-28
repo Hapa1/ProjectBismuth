@@ -4,6 +4,7 @@ import type { ProjectComponentProps } from '../../types/project';
 import styles from './Expanse.module.css';
 
 type PaletteName = 'rag-belur' | 'cc238' | 'dale-paddle' | 'ducci-x';
+type ShadingMode = 'realistic' | 'palette';
 
 interface Controls {
   seed: string;
@@ -11,7 +12,6 @@ interface Controls {
   speed: number;
   sunX: number;
   sunY: number;
-  mouseControlsSun: boolean;
   sunHeight: number;
   gamma: number;
   zoom: number;
@@ -28,6 +28,8 @@ interface Controls {
   mainLevels: number;
   secondaryLevels: number;
   contrastLevels: number;
+  colorVariation: boolean;
+  shadingMode: ShadingMode;
 }
 
 interface Vec2 {
@@ -58,31 +60,33 @@ const DEFAULT_CONTROLS: Controls = {
   seed: createSeed(),
   animate: true,
   speed: 0.55,
-  sunX: 0,
-  sunY: 0,
-  mouseControlsSun: false,
+  sunX: 0.35,
+  sunY: 2,
   sunHeight: 620,
-  gamma: 0,
+  gamma: 2,
   zoom: 1.55,
   heightRange: 10,
-  slopeRange: 0.1,
+  slopeRange: 0.2,
   noiseMagnitude: 3,
   noiseScale: 0.05,
   rotation: 0,
   cellSize: 70,
-  outline: false,
+  outline: true,
   paletteMain: 'rag-belur',
-  paletteSecondary: 'cc238',
+  paletteSecondary: 'rag-belur',
   paletteContrast: 'dale-paddle',
   mainLevels: 3,
   secondaryLevels: 1,
   contrastLevels: 2,
+  colorVariation: true,
+  shadingMode: 'palette',
 };
 
 function ExpanseAnimated({ width, height }: ProjectComponentProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const sketchRef = useRef<P5 | null>(null);
   const controlsRef = useRef<Controls>(DEFAULT_CONTROLS);
+  const hoverStateRef = useRef<HoverState>({ map: new Map(), lastTime: 0 });
   const [controls, setControls] = useState<Controls>(DEFAULT_CONTROLS);
 
   useEffect(() => {
@@ -107,7 +111,7 @@ function ExpanseAnimated({ width, height }: ProjectComponentProps) {
         };
 
         p.draw = () => {
-          drawExpanse(p, width, height, controlsRef.current);
+          drawExpanse(p, width, height, controlsRef.current, hoverStateRef.current);
         };
       };
 
@@ -179,11 +183,6 @@ function ExpanseAnimated({ width, height }: ProjectComponentProps) {
 
         <section className={styles.section}>
           <p className={styles.sectionTitle}>Sun</p>
-          <ToggleControl
-            label="Mouse controls sun"
-            checked={controls.mouseControlsSun}
-            onChange={(checked) => setControls((prev) => ({ ...prev, mouseControlsSun: checked }))}
-          />
           <SliderControl
             label="Sun X"
             min={-2}
@@ -289,6 +288,15 @@ function ExpanseAnimated({ width, height }: ProjectComponentProps) {
 
         <section className={styles.section}>
           <p className={styles.sectionTitle}>Color</p>
+          <ShadingModeControl
+            value={controls.shadingMode}
+            onChange={(value) => setControls((prev) => ({ ...prev, shadingMode: value }))}
+          />
+          <ToggleControl
+            label="Color variation"
+            checked={controls.colorVariation}
+            onChange={(checked) => setControls((prev) => ({ ...prev, colorVariation: checked }))}
+          />
           <SelectControl
             label="Main Palette"
             value={controls.paletteMain}
@@ -426,6 +434,31 @@ function SelectControl({ label, value, options, onChange }: SelectControlProps) 
   );
 }
 
+interface ShadingModeControlProps {
+  value: ShadingMode;
+  onChange: (value: ShadingMode) => void;
+}
+
+function ShadingModeControl({ value, onChange }: ShadingModeControlProps) {
+  return (
+    <div className={styles.row}>
+      <label htmlFor="select-shading-mode" className={styles.label}>
+        Shading
+      </label>
+      <span className={styles.value} />
+      <select
+        id="select-shading-mode"
+        className={styles.select}
+        value={value}
+        onChange={(event) => onChange(event.target.value as ShadingMode)}
+      >
+        <option value="realistic">Realistic (lit)</option>
+        <option value="palette">Palette bands</option>
+      </select>
+    </div>
+  );
+}
+
 interface CellData {
   x: number;
   y: number;
@@ -435,9 +468,10 @@ interface CellData {
   sy: number;
   z: number;
   paletteBand: number;
+  colorIndex: number;
 }
 
-function drawExpanse(p: P5, width: number, height: number, controls: Controls) {
+function drawExpanse(p: P5, width: number, height: number, controls: Controls, hover: HoverState) {
   const t = controls.animate ? p.millis() * 0.001 * controls.speed : 0;
   const seed = hashSeed(controls.seed);
   p.noiseSeed(seed);
@@ -476,28 +510,47 @@ function drawExpanse(p: P5, width: number, height: number, controls: Controls) {
       const y = -totalDim / 2 + yi * ch;
       const noiseBaseX = (x + 1400 + seed * 0.00001) * controls.noiseScale * 0.02;
       const noiseBaseY = (y + 1400 + seed * 0.00002) * controls.noiseScale * 0.02;
-      const n = p.noise(noiseBaseX, noiseBaseY, t * 0.35);
+      const n = smoothNoise2(p, noiseBaseX, noiseBaseY, t * 0.35);
       const nHeight = 1 + Math.max(0, n - 0.4) * 2 * controls.noiseMagnitude;
 
       const sx =
-        (p.noise(noiseBaseX * 1.5 + 70, noiseBaseY * 1.3 + 9, t * 0.28) * 2 - 1) *
+        (smoothNoise2(p, noiseBaseX * 1.2 + 70, noiseBaseY * 1.1 + 9, t * 0.28) * 2 - 1) *
         controls.slopeRange *
         cw *
         nHeight;
       const sy =
-        (p.noise(noiseBaseX * 1.7 + 130, noiseBaseY * 1.2 + 21, t * 0.3) * 2 - 1) *
+        (smoothNoise2(p, noiseBaseX * 1.3 + 130, noiseBaseY * 1.0 + 21, t * 0.3) * 2 - 1) *
         controls.slopeRange *
         ch *
         nHeight;
       const z = (Math.abs(sx) + Math.abs(sy) + controls.heightRange * nHeight) * extrusionScale;
 
       // Position-based colour randomisation (no sequential RNG dependency).
-      const rx = cellHash(xi, yi, seed);
-      const ry = cellHash(xi + 997, yi + 1999, seed);
-      const randomBand = p.noise(noiseBaseX + rx, noiseBaseY + ry, 0.1);
-      const paletteBand = randomBand < 0.62 ? 0 : randomBand < 0.9 ? 1 : 2;
+      // Use Perlin noise (smooth, neighbour-correlated) for both the palette
+      // band selection and the within-palette color index so adjacent cubes
+      // form gradients rather than confetti. When colorVariation is disabled,
+      // every cell uses the main palette — no secondary/contrast splotches.
+      const randomBand = p.noise(noiseBaseX * 0.8 + 53, noiseBaseY * 0.8 + 91, t * 0.12);
+      const paletteBand = controls.colorVariation
+        ? randomBand < 0.62 ? 0 : randomBand < 0.9 ? 1 : 2
+        : 0;
 
-      cells[yi][xi] = { x, y, noiseBaseX, noiseBaseY, sx, sy, z, paletteBand };
+      // Pick one base color per cube so all faces share a hue (top/sides are
+      // lit/shaded variants of the same material rather than different palette entries).
+      // Use a separate Perlin-noise field at lower frequency so neighbouring cubes
+      // share similar hues — producing smooth color gradients across the field.
+      const palette = PALETTES[paletteNames[paletteBand]];
+      const colorField = p.noise(
+        noiseBaseX * 0.6 + (seed % 1000) * 0.0007,
+        noiseBaseY * 0.6 + (seed % 1000) * 0.0011,
+        t * 0.15 + 17,
+      );
+      const colorIndex = Math.min(
+        palette.length - 1,
+        Math.max(0, Math.floor(clamp01(colorField) * palette.length)),
+      );
+
+      cells[yi][xi] = { x, y, noiseBaseX, noiseBaseY, sx, sy, z, paletteBand, colorIndex };
       rawZ[yi][xi] = z;
       rawSx[yi][xi] = sx;
       rawSy[yi][xi] = sy;
@@ -505,17 +558,66 @@ function drawExpanse(p: P5, width: number, height: number, controls: Controls) {
   }
 
   // Pass 2: blur height and slope grids so neighbouring tiles blend smoothly.
-  // Radius 2 averages over a 5×5 neighbourhood, eliminating the sharp exposed
-  // side faces that appear when adjacent tiles differ by even a small amount.
-  const smoothZ = applyBoxBlur(rawZ, rows, cols, 2);
-  const smoothSx = applyBoxBlur(rawSx, rows, cols, 1);
-  const smoothSy = applyBoxBlur(rawSy, rows, cols, 1);
+  // Wider radius on the height grid produces a calmer, more wave-like surface.
+  const smoothZ = applyBoxBlur(rawZ, rows, cols, 3);
+  const smoothSx = applyBoxBlur(rawSx, rows, cols, 2);
+  const smoothSy = applyBoxBlur(rawSy, rows, cols, 2);
 
   p.background('#e5dfcf');
   p.push();
   p.translate(width / 2, height / 2);
 
   const sun = getSunPosition(p, width, height, controls);
+
+  // Decay all hover intensities by elapsed time. Slow fade so the trail is gentle.
+  const now = p.millis() / 1000;
+  const dt = hover.lastTime === 0 ? 0 : Math.min(0.1, now - hover.lastTime);
+  hover.lastTime = now;
+  const fadeRate = 0.6; // intensity per second (1 / fadeRate seconds to fully fade)
+  if (dt > 0 && hover.map.size > 0) {
+    for (const [k, v] of hover.map) {
+      const next = v - dt * fadeRate;
+      if (next <= 0.001) hover.map.delete(k);
+      else hover.map.set(k, next);
+    }
+  }
+
+  // Hit-test: front-to-back (small d first). First top-face containing the
+  // mouse wins. We only check inside-canvas mouse positions.
+  const mouseInside =
+    p.mouseX >= 0 && p.mouseX <= width && p.mouseY >= 0 && p.mouseY <= height;
+  if (mouseInside) {
+    const mx = p.mouseX - width / 2;
+    const my = p.mouseY - height / 2;
+    const maxDHit = cols + rows - 2;
+    let hit: string | null = null;
+    outer: for (let d = 0; d <= maxDHit && hit === null; d += 1) {
+      const xiStart = Math.min(cols - 1, d);
+      const xiEnd = Math.max(0, d - (rows - 1));
+      for (let xi = xiStart; xi >= xiEnd; xi -= 1) {
+        const yi = d - xi;
+        const { x, y } = cells[yi][xi];
+        const z = smoothZ[yi][xi];
+        const sx = smoothSx[yi][xi];
+        const sy = smoothSy[yi][xi];
+        const top: Vec3[] = [
+          { x, y, z: z + sx + sy },
+          { x: x + cw, y, z: z - sx + sy },
+          { x: x + cw, y: y + ch, z: z - sx - sy },
+          { x, y: y + ch, z: z + sx - sy },
+        ];
+        const p0 = project(top[0], basis);
+        const p1 = project(top[1], basis);
+        const p2 = project(top[2], basis);
+        const p3 = project(top[3], basis);
+        if (pointInQuad(mx, my, p0, p1, p2, p3)) {
+          hit = `${xi},${yi}`;
+          break outer;
+        }
+      }
+    }
+    if (hit !== null) hover.map.set(hit, 1);
+  }
 
   // Pass 3: painter's algorithm — diagonal order, far to near.
   const maxD = cols + rows - 2;
@@ -524,13 +626,15 @@ function drawExpanse(p: P5, width: number, height: number, controls: Controls) {
     const xiEnd = Math.max(0, d - (rows - 1));
     for (let xi = xiStart; xi >= xiEnd; xi -= 1) {
       const yi = d - xi;
-      const { x, y, paletteBand } = cells[yi][xi];
+      const { x, y, paletteBand, colorIndex } = cells[yi][xi];
       const z = smoothZ[yi][xi];
       const sx = smoothSx[yi][xi];
       const sy = smoothSy[yi][xi];
 
       const palette = PALETTES[paletteNames[paletteBand]];
       const paletteLevels = levels[paletteBand];
+      const baseColor = palette[colorIndex];
+      const hoverIntensity = hover.map.get(`${xi},${yi}`) ?? 0;
 
       const shapeTop: Vec3[] = [
         { x, y, z: z + sx + sy },
@@ -551,9 +655,9 @@ function drawExpanse(p: P5, width: number, height: number, controls: Controls) {
         shapeTop[1],
       ];
 
-      drawShape(p, basis, shapeLeft, sun, palette, paletteLevels, controls.gamma, controls.outline, 0.86);
-      drawShape(p, basis, shapeRight, sun, palette, paletteLevels, controls.gamma, controls.outline, 0.7);
-      drawShape(p, basis, shapeTop, sun, palette, paletteLevels, controls.gamma, controls.outline, 1.05);
+      drawShape(p, basis, shapeLeft, sun, palette, baseColor, paletteLevels, controls.gamma, controls.outline, 0.78, controls.shadingMode, hoverIntensity);
+      drawShape(p, basis, shapeRight, sun, palette, baseColor, paletteLevels, controls.gamma, controls.outline, 0.62, controls.shadingMode, hoverIntensity);
+      drawShape(p, basis, shapeTop, sun, palette, baseColor, paletteLevels, controls.gamma, controls.outline, 1.08, controls.shadingMode, hoverIntensity);
     }
   }
 
@@ -566,13 +670,22 @@ function drawShape(
   shape: Vec3[],
   sun: Vec3,
   palette: string[],
+  baseColor: string,
   levels: number,
   gamma: number,
   outline: boolean,
   faceBias: number,
+  mode: ShadingMode,
+  hoverIntensity: number,
 ) {
   const illum = clamp01(illuminance(sun, shape, gamma) * faceBias);
-  p.fill(colorFromPalette(palette, illum, levels));
+  let fill = mode === 'realistic'
+    ? shadeColor(baseColor, illum, levels)
+    : colorFromPalette(palette, illum, levels);
+  if (hoverIntensity > 0) {
+    fill = blendTowards(fill, HOVER_TINT, hoverIntensity);
+  }
+  p.fill(fill);
   if (outline) {
     p.stroke(0, 90);
     p.strokeWeight(0.8);
@@ -624,20 +737,134 @@ function illuminance(sun: Vec3, shape: Vec3[], gamma: number): number {
   return clamp01(Math.pow(raw, gammaCurve));
 }
 
-function getSunPosition(p: P5, width: number, height: number, controls: Controls): Vec3 {
-  const sunX = controls.mouseControlsSun ? p.mouseX - width / 2 : (controls.sunX * width) / 2;
-  const sunY = controls.mouseControlsSun
-    ? p.mouseY - height / 2 - controls.sunHeight
-    : (controls.sunY * height) / 2 - controls.sunHeight;
-
+function getSunPosition(_p: P5, width: number, height: number, controls: Controls): Vec3 {
+  const sunX = (controls.sunX * width) / 2;
+  const sunY = (controls.sunY * height) / 2 - controls.sunHeight;
   return { x: sunX, y: sunY, z: controls.sunHeight };
 }
+
+// Warm light tint (sun) and cool shadow tint (sky bounce) — mixing the cube's
+// base hue toward these gives faces a believable single-material appearance
+// under directional light, instead of swapping palette entries per face.
+const LIGHT_TINT = { r: 255, g: 248, b: 228 };
+const SHADOW_TINT = { r: 70, g: 78, b: 100 };
 
 function colorFromPalette(palette: string[], illum: number, levels: number): string {
   const steps = Math.max(1, Math.floor(levels));
   const quantized = Math.round(illum * steps) / steps;
   const index = Math.min(palette.length - 1, Math.max(0, Math.floor(quantized * (palette.length - 1))));
   return palette[index];
+}
+
+function shadeColor(baseHex: string, illum: number, levels: number): string {
+  const base = hexToRgb(baseHex);
+  const steps = Math.max(1, Math.floor(levels) + 2); // smoother bands than raw palette levels
+  // Soft S-curve so mid-tones dominate and pure black/white are rare.
+  const eased = smoothstep(0.05, 0.95, illum);
+  const quantized = Math.round(eased * steps) / steps;
+
+  // Brightness bias — push the whole curve up so the scene reads as lit, not
+  // half-shadowed. 0 = neutral, >0 = brighter.
+  const brightness = 0.18;
+  const lit = clamp01(quantized + brightness);
+
+  let r: number;
+  let g: number;
+  let b: number;
+  if (lit < 0.5) {
+    // Shadow side: lerp from cool shadow toward base, but keep ambient floor
+    // high so the hue is still readable in shadow.
+    const t = lit * 2; // 0..1
+    const k = 0.6 + t * 0.4; // 0.6 .. 1.0 — mostly base, only a touch of cool tint
+    r = lerp(SHADOW_TINT.r, base.r, k);
+    g = lerp(SHADOW_TINT.g, base.g, k);
+    b = lerp(SHADOW_TINT.b, base.b, k);
+  } else {
+    // Lit side: lerp from base toward warm light. Stronger cap so highlights pop.
+    const t = (lit - 0.5) * 2; // 0..1
+    const k = t * 0.65; // 0 .. 0.65
+    r = lerp(base.r, LIGHT_TINT.r, k);
+    g = lerp(base.g, LIGHT_TINT.g, k);
+    b = lerp(base.b, LIGHT_TINT.b, k);
+  }
+  return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
+}
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const h = hex.replace('#', '');
+  const v = parseInt(h.length === 3 ? h.split('').map((c) => c + c).join('') : h, 16);
+  return { r: (v >> 16) & 0xff, g: (v >> 8) & 0xff, b: v & 0xff };
+}
+
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
+}
+
+function smoothstep(edge0: number, edge1: number, x: number): number {
+  const t = clamp01((x - edge0) / (edge1 - edge0));
+  return t * t * (3 - 2 * t);
+}
+
+// Smoother noise field used for the height/slope of the expanse. Combines:
+//   1. Domain warping  — sample coords are perturbed by a low-frequency noise
+//      field so ridges flow organically instead of aligning to the grid.
+//   2. Two-octave fBm  — gives a touch of natural variation without high-frequency
+//      chatter (octave 2 amplitude is small).
+//   3. Smoothstep ease — softens the response curve so peaks and valleys
+//      transition gently rather than abruptly.
+function smoothNoise2(p: P5, x: number, y: number, t: number): number {
+  const warpX = (p.noise(x * 0.5 + 100, y * 0.5 + 200, t * 0.2) - 0.5) * 1.4;
+  const warpY = (p.noise(x * 0.5 + 311, y * 0.5 + 411, t * 0.2 + 5) - 0.5) * 1.4;
+  const wx = x + warpX;
+  const wy = y + warpY;
+  const o1 = p.noise(wx, wy, t);
+  const o2 = p.noise(wx * 2.0 + 17, wy * 2.0 + 31, t * 1.15);
+  const summed = (o1 * 1.0 + o2 * 0.35) / 1.35;
+  return summed * summed * (3 - 2 * summed);
+}
+
+interface HoverState {
+  map: Map<string, number>;
+  lastTime: number;
+}
+
+// Accent highlight color used when a tile is hovered. Matches the site accent.
+const HOVER_TINT = { r: 167, g: 139, b: 250 };
+
+function blendTowards(
+  cssColor: string,
+  target: { r: number; g: number; b: number },
+  t: number,
+): string {
+  const k = clamp01(t);
+  const base = parseCssRgb(cssColor);
+  const r = Math.round(lerp(base.r, target.r, k));
+  const g = Math.round(lerp(base.g, target.g, k));
+  const b = Math.round(lerp(base.b, target.b, k));
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+function parseCssRgb(s: string): { r: number; g: number; b: number } {
+  if (s.startsWith('#')) return hexToRgb(s);
+  const m = s.match(/rgb\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/);
+  if (!m) return { r: 0, g: 0, b: 0 };
+  return { r: Number(m[1]), g: Number(m[2]), b: Number(m[3]) };
+}
+
+// Treats the four projected vertices of the top face as a convex quad and
+// tests if (mx, my) lies inside via consistent cross-product signs.
+function pointInQuad(mx: number, my: number, a: Vec2, b: Vec2, c: Vec2, d: Vec2): boolean {
+  const s1 = sign2(mx, my, a, b);
+  const s2 = sign2(mx, my, b, c);
+  const s3 = sign2(mx, my, c, d);
+  const s4 = sign2(mx, my, d, a);
+  const hasPos = s1 > 0 || s2 > 0 || s3 > 0 || s4 > 0;
+  const hasNeg = s1 < 0 || s2 < 0 || s3 < 0 || s4 < 0;
+  return !(hasPos && hasNeg);
+}
+
+function sign2(mx: number, my: number, p1: Vec2, p2: Vec2): number {
+  return (mx - p2.x) * (p1.y - p2.y) - (p1.x - p2.x) * (my - p2.y);
 }
 
 function centerOf(points: Vec3[]): Vec3 {
@@ -704,13 +931,6 @@ function applyBoxBlur(grid: number[][], rows: number, cols: number, radius: numb
     }
   }
   return result;
-}
-
-function cellHash(xi: number, yi: number, seed: number): number {
-  let h = ((seed ^ (xi * 2654435761)) ^ (yi * 1234567891)) >>> 0;
-  h = (Math.imul(h ^ (h >>> 16), 0x45d9f3b)) >>> 0;
-  h = (Math.imul(h ^ (h >>> 16), 0x45d9f3b)) >>> 0;
-  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
 function hashSeed(seed: string): number {
