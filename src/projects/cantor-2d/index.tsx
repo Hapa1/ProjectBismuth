@@ -40,7 +40,6 @@ function drawCantorSet(
   p.line(x, y + verticalOffset, x + len, y + verticalOffset);
 
   if (depth > 0) {
-    const gapRatio = 1 - spread * 2; // spread controls the removed middle portion
     const newLen = len * spread;
     const nextY = y + 40;
 
@@ -144,7 +143,6 @@ function Cantor2D({ width, height }: ProjectComponentProps) {
         p.mousePressed = () => {
           const host = hostRef.current;
           if (!host) return false;
-          const rect = host.getBoundingClientRect();
           const mx = p.mouseX;
           const my = p.mouseY;
           if (mx > 0 && mx < sizeRef.current.width && my > 0 && my < sizeRef.current.height) {
@@ -209,10 +207,6 @@ function Cantor2D({ width, height }: ProjectComponentProps) {
 
   const setSpread = useCallback((spread: number) => {
     setControls((p) => ({ ...p, spread }));
-  }, []);
-
-  const setStrokeWeight = useCallback((strokeWeight: number) => {
-    setControls((p) => ({ ...p, strokeWeight }));
   }, []);
 
   const toggleAutoAnimate = useCallback(() => {
