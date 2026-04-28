@@ -131,6 +131,17 @@ export const projectRegistry: RegistryEntry[] = [
   },
   {
     meta: {
+      id: 'geometria',
+      title: 'Geometria',
+      year: 2026,
+      renderer: 'three',
+      description: 'Iridescent construction of the sacred-geometry sequence — circle to Platonic solids — drawn by a glowing pencil tip.',
+      tags: ['three', 'shader', 'geometry', 'animation'],
+    },
+    load: () => import('./geometria'),
+  },
+  {
+    meta: {
       id: 'gargantua',
       title: 'Gargantua',
       year: 2026,
