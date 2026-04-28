@@ -394,7 +394,7 @@ function PhaseChips({ controller, data }: PhaseChipsProps) {
 // Public component
 // ---------------------------------------------------------------------------
 
-function Geometria({ width, height }: ProjectComponentProps) {
+function Geometria({ width }: ProjectComponentProps) {
   const reduceMotion = usePrefersReducedMotion();
   const data = useMemo(() => buildStrokeData(), []);
   const controller = useRef<ControllerState>(makeController());

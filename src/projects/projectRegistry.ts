@@ -151,6 +151,17 @@ export const projectRegistry: RegistryEntry[] = [
     },
     load: () => import('./gargantua'),
   },
+  {
+    meta: {
+      id: 'geometry-beneath',
+      title: 'Geometry Beneath Everything',
+      year: 2026,
+      renderer: 'p5',
+      description: 'Live visual aid for the talk: branching, spiral, and tiling — three pillars in one canvas.',
+      tags: ['p5', 'fractal', 'spiral', 'tiling', 'controls', 'presentation'],
+    },
+    load: () => import('./geometry-beneath'),
+  },
 ];
 
 /** Returns a React.lazy component for the given project id. */
