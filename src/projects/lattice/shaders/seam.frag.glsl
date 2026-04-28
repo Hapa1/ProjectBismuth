@@ -108,9 +108,13 @@ void main() {
       spot = exp(-(ad * ad) / (ar * ar)) * ai;
     }
     pulseSpot += spot;
-    // Each pulse picks a hue offset; saturate strongly.
-    vec3 hue = hsv2rgb(vec3(fract(uPulseHue[i]), 0.85, 1.0));
-    pulseColor += hue * spot;
+    // Iridescent color: blend the per-pulse hue with the swirling colorField
+    // so the ripple shimmers instead of reading as a flat color. The hue
+    // offset gives each pulse its own bias.
+    vec3 base = hsv2rgb(vec3(fract(uPulseHue[i]), 0.85, 1.0));
+    vec3 iri  = colorField(vWorldXY + vec2(uPulseHue[i] * 7.3), uTime + uPulseAge[i] * 1.5);
+    vec3 tint = ripple ? mix(base, iri, 0.75) : base;
+    pulseColor += tint * spot;
   }
 
   float totalSpot = pointerSpot + pulseSpot;

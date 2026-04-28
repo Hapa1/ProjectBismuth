@@ -153,6 +153,17 @@ export const projectRegistry: RegistryEntry[] = [
   },
   {
     meta: {
+      id: 'bismuth',
+      title: 'Bismuth',
+      year: 2026,
+      renderer: 'three',
+      description: 'Branching recursive hopper-crystal structure with iridescent fresnel shading.',
+      tags: ['three', 'shader', 'fractal', 'iridescent', 'geometry'],
+    },
+    load: () => import('./bismuth'),
+  },
+  {
+    meta: {
       id: 'cantor-2d',
       title: 'Cantor Set',
       year: 2026,

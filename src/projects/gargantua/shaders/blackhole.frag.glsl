@@ -136,38 +136,58 @@ vec3 hotColor(float t) {
   return mix(gold, white, (t - 0.66) / 0.34);
 }
 
-vec4 sampleDisk(vec3 hitPoint, vec3 rayDir) {
-  float r        = length(hitPoint.xz);
-  float angle    = atan(hitPoint.z, hitPoint.x);
-  float rNorm    = clamp((r - uDiskInner) / max(uDiskOuter - uDiskInner, 0.001), 0.0, 1.0);
+// Volumetric emissive sample.
+// Returns linear-light emission (no opacity) for a single point in space; the
+// raymarcher integrates this along the ray, so light naturally bleeds outward
+// into a soft glow instead of forming a hard slab.
+vec3 sampleDiskEmission(vec3 p, vec3 rayDir) {
+  float r     = length(p.xz);
+  float y     = p.y;
 
-  // Polar noise: spirals inward as time advances
-  float a       = angle + uTime * uDiskSpin;
-  vec2  noiseUV = vec2(a * 5.0, r * 3.0 - uTime * 0.4);
-  float density = mix(fbm(noiseUV), fbm(noiseUV * 2.3 + 5.0), 0.4);
+  // Smooth radial profile: bright peak just outside uDiskInner, soft falls off
+  // toward both edges. Built from two smoothsteps so there are no hard rings.
+  float inner = smoothstep(uDiskInner * 0.7, uDiskInner * 1.15, r);
+  float outer = 1.0 - smoothstep(uDiskOuter * 0.55, uDiskOuter * 1.05, r);
+  float radial = inner * outer;
+  if (radial <= 0.0) return vec3(0.0);
 
-  // Heat: hottest at the inner edge
+  // Vertical Gaussian: thickness scales with radius (thin near the BH, puffier outside).
+  // This gives the disk a smooth volumetric body — grazing rays no longer hit a slab.
+  float thickness = mix(0.10, 0.45, smoothstep(uDiskInner, uDiskOuter, r)) * uMass;
+  float vert      = exp(-(y * y) / (thickness * thickness));
+
+  // Normalised radius for colour / brightness curves.
+  float rNorm = clamp((r - uDiskInner) / max(uDiskOuter - uDiskInner, 0.001), 0.0, 1.0);
+
+  // Whisper of turbulence — sampled in seam-free Cartesian space, rotated by spin.
+  float spin = uTime * uDiskSpin;
+  float cs   = cos(spin);
+  float sn   = sin(spin);
+  vec2  pxz  = vec2(p.x * cs - p.z * sn, p.x * sn + p.z * cs);
+  float n    = fbm(pxz * 0.6 + vec2(uTime * 0.2, 0.0));
+  // Map noise to a gentle multiplier in [0.75, 1.25] — never enough to clump.
+  float swirl = mix(0.75, 1.25, smoothstep(0.25, 0.75, n));
+
+  // Heat / colour (hot inner, cool outer).
   float heat = pow(1.0 - rNorm, mix(1.8, 0.9, uDiskTemp));
   vec3  col  = hotColor(heat);
 
-  // Brightness profile
-  float bri  = pow(1.0 - rNorm, 1.4) * 2.2;
-  bri       += pow(density, 3.5) * uTurbulence * 1.6;
+  // Brightness — strong inner peak, gentle outer halo. Inverse-r adds a glow
+  // that bleeds beyond the geometric body of the disk.
+  float bri = (0.6 + 1.6 * pow(1.0 - rNorm, 1.6)) * radial * vert * swirl;
+  bri      += 0.18 * radial / (0.05 + rNorm);          // inner halo bleed
+  bri      += 0.30 * exp(-abs(y) / (thickness * 1.8))  // outer puff above/below
+              * radial * uTurbulence * 0.5;
 
-  // Doppler: relativistic beaming on the side of the disk moving toward us
-  vec3  orbit   = normalize(vec3(-hitPoint.z, 0.0, hitPoint.x));
+  // Doppler beaming
+  vec3  orbit   = normalize(vec3(-p.z, 0.0, p.x));
   float doppler = dot(orbit, -rayDir);
   float dShift  = 1.0 + doppler * uDopplerStrength * (1.0 - rNorm * 0.6);
-  bri          *= clamp(dShift * dShift, 0.15, 4.5);
+  bri          *= clamp(dShift * dShift, 0.2, 4.5);
   col          *= mix(vec3(1.05, 0.95, 0.85), vec3(0.85, 0.95, 1.10),
                       0.5 + 0.5 * doppler);
 
-  // Soft inner / outer fades
-  float innerFade = smoothstep(0.0, 0.06, rNorm);
-  float outerFade = smoothstep(1.0, 0.85, rNorm);
-  float alpha     = innerFade * outerFade * uDiskOpacity;
-
-  return vec4(col * bri * uDiskBrightness, alpha);
+  return col * bri * uDiskBrightness * uDiskOpacity * 0.18;
 }
 
 // ============================================================
@@ -177,7 +197,6 @@ vec3 traceRay(vec3 ro, vec3 rd) {
   vec3  pos    = ro;
   vec3  vel    = rd;
   vec3  accum  = vec3(0.0);
-  float opa    = 0.0;       // accumulated disk opacity
   bool  ate    = false;     // crossed event horizon
 
   float Rs    = uMass;
@@ -209,26 +228,18 @@ vec3 traceRay(vec3 ro, vec3 rd) {
       accum += vec3(1.0, 0.78, 0.32) * uPhotonIntensity * 0.05 * falloff;
     }
 
-    vec3 newPos = pos + vel * dt;
+    // Volumetric disk: emissive contribution every step. Because the disk has
+    // radial AND vertical extent, light bleeds outward to form a soft glow
+    // instead of a hard slab. Using midpoint of the step keeps it stable.
+    vec3 mid = pos + vel * (dt * 0.5);
+    accum   += sampleDiskEmission(mid, normalize(vel)) * dt;
 
-    // Disk crossing: sign change in y while inside the disk's radial range
-    if (sign(pos.y) != sign(newPos.y) && opa < 0.99) {
-      float t   = -pos.y / (vel.y + sign(vel.y) * 1e-5);
-      vec3  hit = pos + vel * t;
-      float hr  = length(hit.xz);
-      if (hr > uDiskInner && hr < uDiskOuter) {
-        vec4 d = sampleDisk(hit, normalize(vel));
-        accum += d.rgb * (1.0 - opa);
-        opa   += d.a   * (1.0 - opa);
-      }
-    }
-
-    pos = newPos;
+    pos += vel * dt;
   }
 
   // Background stars fill whatever's left
   if (!ate) {
-    accum += starsBackground(normalize(vel)) * (1.0 - opa);
+    accum += starsBackground(normalize(vel));
   }
 
   return accum;

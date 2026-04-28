@@ -368,7 +368,7 @@ function Prismata({ width, height }: ProjectComponentProps) {
   const isPresentationRoute =
     typeof window !== 'undefined' && window.location.pathname === '/';
   const isPerformanceMode = reduceMotion || isPresentationRoute;
-  const showControlsPanel = !isPresentationRoute;
+  const showControlsPanel = true;
 
   const sceneControls = useMemo(
     () =>
