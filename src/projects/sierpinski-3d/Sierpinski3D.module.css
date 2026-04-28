@@ -1,0 +1,234 @@
+.root {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column-reverse;
+  background: #0a0a0a;
+  overflow: hidden;
+
+  @media (min-width: 768px) {
+    flex-direction: row;
+  }
+}
+
+.canvasContainer {
+  flex: 1;
+  min-height: 50dvh;
+  position: relative;
+  background: #0a0a0a;
+  border-radius: 12px;
+  border: 1px solid rgba(167, 139, 250, 0.1);
+  overflow: hidden;
+
+  @media (min-width: 768px) {
+    min-height: 100%;
+  }
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: rgba(10, 10, 10, 0.95);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid rgba(167, 139, 250, 0.1);
+  max-height: 48dvh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(167, 139, 250, 0.2) transparent;
+
+  @media (min-width: 768px) {
+    width: min(18.5rem, 36vw);
+    max-height: 100%;
+    border-top: none;
+    border-left: 1px solid rgba(167, 139, 250, 0.1);
+  }
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(167, 139, 250, 0.2);
+    border-radius: 3px;
+
+    &:hover {
+      background: rgba(167, 139, 250, 0.4);
+    }
+  }
+}
+
+.panelTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #e8eaef;
+  margin: 0;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.tagline {
+  font-size: 0.875rem;
+  color: #9a9a9a;
+  margin: 0.5rem 0 0;
+  line-height: 1.4;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sectionTitle {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #a78bfa;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.label {
+  font-size: 0.8rem;
+  color: #e8eaef;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.value {
+  font-size: 0.8rem;
+  color: #a78bfa;
+  text-align: right;
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+.slider {
+  width: 100%;
+  height: 4px;
+  appearance: none;
+  background: linear-gradient(to right, #a78bfa 0%, #a78bfa var(--slider-fill, 50%), rgba(167, 139, 250, 0.2) var(--slider-fill, 50%), rgba(167, 139, 250, 0.2) 100%);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+
+  &::-webkit-slider-thumb {
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #a78bfa;
+    cursor: pointer;
+    border: 2px solid #0a0a0a;
+    box-shadow: 0 0 8px rgba(167, 139, 250, 0.4);
+    transition: all 0.2s ease;
+
+    &:hover,
+    &:focus-visible {
+      width: 16px;
+      height: 16px;
+      box-shadow: 0 0 12px rgba(167, 139, 250, 0.6);
+    }
+  }
+
+  &::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #a78bfa;
+    cursor: pointer;
+    border: 2px solid #0a0a0a;
+    box-shadow: 0 0 8px rgba(167, 139, 250, 0.4);
+    transition: all 0.2s ease;
+
+    &:hover,
+    &:focus-visible {
+      width: 16px;
+      height: 16px;
+      box-shadow: 0 0 12px rgba(167, 139, 250, 0.6);
+    }
+  }
+}
+
+.checkboxRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  cursor: pointer;
+
+  input[type='checkbox'] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: #a78bfa;
+    appearance: none;
+    border: 2px solid #a78bfa;
+    border-radius: 3px;
+    background: transparent;
+    transition: all 0.2s ease;
+
+    &:checked {
+      background: #a78bfa;
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--color-focus-ring);
+      outline-offset: 2px;
+    }
+  }
+
+  label {
+    font-size: 0.875rem;
+    color: #e8eaef;
+    font-family: 'IBM Plex Mono', monospace;
+    cursor: pointer;
+  }
+}
+
+.buttonRow {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.button {
+  flex: 1;
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: 1px solid #a78bfa;
+  color: #a78bfa;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-family: 'IBM Plex Mono', monospace;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover,
+  &:focus-visible {
+    background: rgba(167, 139, 250, 0.1);
+    box-shadow: inset 0 0 12px rgba(167, 139, 250, 0.2);
+  }
+
+  &:active {
+    background: rgba(167, 139, 250, 0.2);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-focus-ring);
+    outline-offset: 2px;
+  }
+}
