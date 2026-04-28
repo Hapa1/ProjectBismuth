@@ -9,15 +9,22 @@ import { SlideCompare } from '../components/slides/SlideCompare';
 import { SlideAnnotation } from '../components/slides/SlideAnnotation';
 import { SymbolWall } from '../components/slides/SymbolWall';
 import { SymbolExhibits } from '../components/slides/exhibits/SymbolExhibits';
+import { ArtistCarousel } from '../components/slides/ArtistCarousel';
 
 /**
  * Components automatically available inside any slide MDX file. Authors can
  * use <Demo>, <Placeholder>, <SymbolWall>, <SymbolExhibits>, <Overlay>,
- * <Title>, <Eyebrow>, <Body>, <Prompt>, <Code>, <Compare>, and <Annotation>
- * with no per-file imports thanks to MDXProvider in SlideshowView.
+ * <Title>, <Eyebrow>, <Body>, <Prompt>, <Code>, <Compare>, <Annotation>,
+ * and <ArtistCarousel> with no per-file imports thanks to MDXProvider in
+ * SlideshowView.
  *
  * <Annotation> is the generic dismissable floating widget host — a prompt is
  * just one kind of annotation. Any child widget can be placed inside it.
+ *
+ * For the carousel:
+ *   <ArtistCarousel />                          — full-width, default artists
+ *   <ArtistCarousel rightInset="calc(min(18.5rem, 36vw) + 1.5rem)" />
+ *                                               — leaves room for a right panel
  */
 export const slideMdxComponents: MDXComponents = {
   Demo: SlideDemo,
@@ -32,4 +39,5 @@ export const slideMdxComponents: MDXComponents = {
   Code: SlideCode,
   Compare: SlideCompare,
   Annotation: SlideAnnotation,
+  ArtistCarousel,
 };

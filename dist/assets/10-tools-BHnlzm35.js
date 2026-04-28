@@ -1,5 +1,0 @@
-import{u as a,j as e}from"./index-DfGpesBi.js";const x={id:"v2-tools",title:"Tools"};function l(o){const n={p:"p",...a(),...o.components},{Body:r,Demo:s,Eyebrow:i,Overlay:c,Title:d}=n;return r||t("Body"),s||t("Demo"),i||t("Eyebrow"),c||t("Overlay"),d||t("Title"),e.jsxs(e.Fragment,{children:[e.jsx(s,{projectId:"voronoi"}),`
-`,e.jsxs(c,{position:"bottom-right",children:[e.jsx(i,{children:"Tools"}),e.jsx(d,{children:"Where to start"}),e.jsx(r,{children:e.jsxs(n.p,{children:[e.jsx("strong",{children:"Beginner:"}),` p5.js, Processing, TouchDesigner, Hydra,\r
-Three.js, Blender + Python, ShaderToy / GLSL, Sonic Pi, TidalCycles.`]})}),e.jsx(r,{children:e.jsxs(n.p,{children:[e.jsx("strong",{children:"AI-assisted:"}),` ChatGPT, GitHub Copilot, Cursor, VS Code\r
-with AI. Pair them with the tools above and the gap between idea and\r
-working sketch closes fast.`]})})]})]})}function j(o={}){const{wrapper:n}={...a(),...o.components};return n?e.jsx(n,{...o,children:e.jsx(l,{...o})}):l(o)}function t(o,n){throw new Error("Expected component `"+o+"` to be defined: you likely forgot to import, pass, or provide it.")}export{j as default,x as meta};
