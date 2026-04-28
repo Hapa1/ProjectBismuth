@@ -107,6 +107,17 @@ export const projectRegistry: RegistryEntry[] = [
     },
     load: () => import('./apex'),
   },
+  {
+    meta: {
+      id: 'prismata',
+      title: 'Prismata',
+      year: 2026,
+      renderer: 'three',
+      description: 'Recursive iridescent spire built from shared line, polygon, and solid primitives — synced to audio.',
+      tags: ['three', 'shader', 'audio', 'fractal', 'iridescent'],
+    },
+    load: () => import('./prismata'),
+  },
 ];
 
 /** Returns a React.lazy component for the given project id. */

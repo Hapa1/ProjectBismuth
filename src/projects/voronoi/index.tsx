@@ -4,7 +4,8 @@ import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import type { ProjectComponentProps } from '../../types/project';
 import styles from './Voronoi.module.css';
-import { useAudioAnalyser, type AudioBands } from '../../lib/useAudioAnalyser';
+import type { AudioBands } from '../../lib/useAudioAnalyser';
+import { useAudioController } from '../../state/AudioProvider';
 
 import voronoiVert from './shaders/voronoi.vert.glsl?raw';
 import voronoiFrag from './shaders/voronoi.frag.glsl?raw';
@@ -377,7 +378,7 @@ function Slider({ label, min, max, step, value, onChange, format }: SliderProps)
 function Voronoi({ width, height }: ProjectComponentProps) {
   const reduceMotion = usePrefersReducedMotion();
   const [controls, setControls] = useState<Controls>(DEFAULTS);
-  const audio = useAudioAnalyser();
+  const audio = useAudioController();
   const meterRef = useRef<HTMLDivElement>(null);
   const pulseDecayRef = useRef(controls.pulseDecay);
 

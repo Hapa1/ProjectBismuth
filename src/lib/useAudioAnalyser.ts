@@ -213,59 +213,98 @@ export function useAudioAnalyser(): AudioController {
     if (ctx.state === 'suspended') await ctx.resume();
     tearDownSource();
 
-    // Synthesise a moody pad-like demo signal — three detuned oscillators with LFO
+    // Soundbath: multiple singing bowl voices with inharmonic partials,
+    // periodic strike envelopes, gentle vibrato, and a long reverb tail.
     const target = gainRef.current!;
-    const master = ctx.createGain();
-    master.gain.value = 0.18;
-    master.connect(target);
 
-    const freqs = [110, 220, 440, 660];
-    const types: OscillatorType[] = ['sine', 'triangle', 'sawtooth', 'sine'];
-    for (let i = 0; i < freqs.length; i += 1) {
-      const osc = ctx.createOscillator();
-      const og = ctx.createGain();
-      const lfo = ctx.createOscillator();
-      const lfoGain = ctx.createGain();
-      osc.type = types[i];
-      osc.frequency.value = freqs[i];
-      og.gain.value = 0.25 / (i + 1);
-      lfo.type = 'sine';
-      lfo.frequency.value = 0.15 + i * 0.1;
-      lfoGain.gain.value = 0.18;
-      lfo.connect(lfoGain);
-      lfoGain.connect(og.gain);
-      osc.connect(og);
-      og.connect(master);
-      osc.start();
-      lfo.start();
-      oscNodesRef.current.push(osc, lfo);
+    // Master bus — kept quiet; the gain node (gainRef) adds its own level on top
+    const master = ctx.createGain();
+    master.gain.value = 0.2;
+
+    // Warmth filter: roll off harsh highs
+    const warmth = ctx.createBiquadFilter();
+    warmth.type = 'lowpass';
+    warmth.frequency.value = 4000;
+    warmth.Q.value = 0.5;
+
+    // Long reverb tail via a feedback delay loop with an inner LPF to darken it
+    const delay = ctx.createDelay(4.0);
+    delay.delayTime.value = 2.8;
+    const fbGain = ctx.createGain();
+    fbGain.gain.value = 0.42;
+    const fbLpf = ctx.createBiquadFilter();
+    fbLpf.type = 'lowpass';
+    fbLpf.frequency.value = 1800;
+
+    // Routing: master → warmth → [direct out] + [delay tail loop → out]
+    master.connect(warmth);
+    warmth.connect(target);          // dry
+    warmth.connect(delay);
+    delay.connect(fbLpf);
+    fbLpf.connect(fbGain);
+    fbGain.connect(delay);           // feedback
+    fbLpf.connect(target);           // wet tail
+
+    // Bowl fundamentals (loosely pentatonic over two octaves: C / G / C / E / G / C)
+    const bowlFreqs = [128, 192, 256, 320, 384, 512];
+
+    // Authentic singing-bowl inharmonic partial ratios (circular plate physics)
+    const partialRatios = [1, 2.756, 5.404];
+    const partialAmps   = [0.55, 0.28, 0.12];
+
+    for (let b = 0; b < bowlFreqs.length; b += 1) {
+      const f0 = bowlFreqs[b];
+
+      // Per-bowl gain node; its gain is modulated by the strike LFO
+      const bowlGain = ctx.createGain();
+      bowlGain.gain.value = 0.5;       // base; LFO adds swing around this
+      bowlGain.connect(master);
+
+      // Strike LFO: slow sine offset to [0 … 1], random phase & rate per bowl
+      // Gives the feel of periodic gong strikes with long ringing decays
+      const strikeRate = 0.045 + Math.random() * 0.055; // ~9–22 s between strikes
+      const strikeLFO  = ctx.createOscillator();
+      const strikeMod  = ctx.createGain();
+      strikeLFO.type = 'sine';
+      strikeLFO.frequency.value = strikeRate;
+      strikeMod.gain.value = 0.5;   // swings ±0.5 around the base 0.5 → [0, 1]
+      strikeLFO.connect(strikeMod);
+      strikeMod.connect(bowlGain.gain);
+      // Stagger start phase by offsetting frequency temporarily — simpler: just delay start
+      const phaseDelay = Math.random() * (1 / strikeRate);
+      strikeLFO.start(ctx.currentTime + phaseDelay);
+      oscNodesRef.current.push(strikeLFO, strikeMod);
+
+      // Inharmonic partials for each bowl
+      for (let p = 0; p < partialRatios.length; p += 1) {
+        const freq = f0 * partialRatios[p];
+
+        const osc = ctx.createOscillator();
+        const og  = ctx.createGain();
+        osc.type = 'sine';
+        // Tiny random detune (±0.2 %) per partial → natural beating between bowls
+        osc.frequency.value = freq * (1 + (Math.random() - 0.5) * 0.004);
+        og.gain.value = partialAmps[p] / bowlFreqs.length;
+
+        // Very gentle vibrato (simulates the sustained ring of a real bowl)
+        const vib     = ctx.createOscillator();
+        const vibGain = ctx.createGain();
+        vib.type = 'sine';
+        vib.frequency.value = 0.6 + Math.random() * 0.8; // 0.6 – 1.4 Hz
+        vibGain.gain.value = freq * 0.0018;               // ~0.18 % depth
+        vib.connect(vibGain);
+        vibGain.connect(osc.frequency);
+
+        osc.connect(og);
+        og.connect(bowlGain);
+        osc.start();
+        vib.start();
+        oscNodesRef.current.push(osc, vib, og);
+      }
     }
 
-    // Slow noise pulse for "kick"
-    const bufferSize = 2 * ctx.sampleRate;
-    const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const noiseData = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i += 1) noiseData[i] = Math.random() * 2 - 1;
-    const noise = ctx.createBufferSource();
-    noise.buffer = noiseBuffer;
-    noise.loop = true;
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.value = 110;
-    const ng = ctx.createGain();
-    ng.gain.value = 0.0;
-    const ngLFO = ctx.createOscillator();
-    const ngLFOGain = ctx.createGain();
-    ngLFO.frequency.value = 0.6;
-    ngLFOGain.gain.value = 0.35;
-    ngLFO.connect(ngLFOGain);
-    ngLFOGain.connect(ng.gain);
-    noise.connect(filter);
-    filter.connect(ng);
-    ng.connect(master);
-    noise.start();
-    ngLFO.start();
-    oscNodesRef.current.push(noise, ngLFO);
+    // Push utility nodes so tearDownSource disconnects them all cleanly
+    oscNodesRef.current.push(delay, fbGain, fbLpf, warmth);
 
     sourceNodeRef.current = master;
     startLoop();

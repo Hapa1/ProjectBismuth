@@ -23,13 +23,6 @@ vec3 hsl2rgb(vec3 c) {
   return c.z + c.y * (rgb - 0.5) * (1.0 - abs(2.0 * c.z - 1.0));
 }
 
-// Cheap hash for sparkle
-float hash13(vec3 p) {
-  p = fract(p * vec3(443.8975, 397.2973, 491.1871));
-  p += dot(p, p.yzx + 19.19);
-  return fract((p.x + p.y) * p.z);
-}
-
 void main() {
   vec3 N = normalize(vNormalW);
   vec3 V = normalize(cameraPosition - vWorldPos);
@@ -61,22 +54,6 @@ void main() {
 
   // Soft inner glow at tips — static
   base += vec3(1.0, 0.92, 0.78) * pow(vY01, 4.0) * 0.22;
-
-  // ---------------------------------------------------------------------
-  // Subtle audio sparkle: pinpoint twinkles on facets, riding on treble.
-  // ---------------------------------------------------------------------
-  vec3 sparkleSeed = floor(vWorldPos * 18.0 + vSeed * 7.0);
-  float h = hash13(sparkleSeed);
-  // Each cell twinkles at its own phase; treble decides who is currently lit.
-  float phase = h * 6.2831 + uTime * (1.5 + h * 2.0);
-  float twinkle = pow(0.5 + 0.5 * sin(phase), 24.0);
-  // Threshold so only a few cells fire at once, scaled by treble + level.
-  float threshold = 0.85 - clamp(uTreble * 0.45 + uLevel * 0.15, 0.0, 0.55);
-  float gate = smoothstep(threshold, threshold + 0.02, h);
-  float sparkle = twinkle * gate * (0.25 + uTreble * 1.6);
-  // Sparkle favors faces that point toward the camera (catches the eye).
-  sparkle *= 0.4 + 0.6 * ndv;
-  base += vec3(1.0, 0.96, 0.85) * sparkle;
 
   // Very gentle overall lift with level so the field "breathes" rather than pumps.
   base *= 0.95 + uLevel * 0.10;

@@ -5,7 +5,8 @@ import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import type { ProjectComponentProps } from '../../types/project';
 import styles from './Io.module.css';
-import { useAudioAnalyser, type AudioBands } from '../../lib/useAudioAnalyser';
+import type { AudioBands } from '../../lib/useAudioAnalyser';
+import { useAudioController } from '../../state/AudioProvider';
 
 import skyVert from './shaders/sky.vert.glsl?raw';
 import skyFrag from './shaders/sky.frag.glsl?raw';
@@ -839,7 +840,7 @@ function Slider({ label, min, max, step, value, onChange, format }: SliderProps)
 
 function Io({ width, height }: ProjectComponentProps) {
   const [controls, setControls] = useState<Controls>(DEFAULTS);
-  const audio = useAudioAnalyser();
+  const audio = useAudioController();
   const reduceMotion = usePrefersReducedMotion();
   const meterRef = useRef<HTMLDivElement>(null);
 

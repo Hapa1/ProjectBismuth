@@ -1,0 +1,83 @@
+import { useEffect, useMemo } from 'react';
+import * as THREE from 'three';
+import { IRIDESCENT_FRAG, IRIDESCENT_VERT } from './shaders.glsl';
+import {
+  DEFAULT_PALETTE_OFFSET,
+  type IridescentMaterialOptions,
+  type IridescentPaletteMode,
+} from './types';
+
+const PALETTE_MODE_INDEX: Record<IridescentPaletteMode, number> = {
+  cosine: 0,
+  colorField: 1,
+};
+
+/**
+ * Builds a single iridescent ShaderMaterial. The material is memoized so
+ * fractal trees can share one material instance across many meshes — the
+ * recommended pattern for this library. Disposes itself on unmount.
+ *
+ * Audio uniforms (`uMirage`, `uLevel`, `uTreble`) start at neutral values;
+ * drive them from `useFrame` if you want audio reactivity. Non-audio
+ * uniforms reflect the props passed in and are kept up to date on change.
+ */
+export function useIridescentMaterial(options: IridescentMaterialOptions = {}): THREE.ShaderMaterial {
+  const material = useMemo(() => {
+    const offset = options.paletteOffset ?? DEFAULT_PALETTE_OFFSET;
+    const palette = options.palette ?? 'cosine';
+    return new THREE.ShaderMaterial({
+      vertexShader: IRIDESCENT_VERT,
+      fragmentShader: IRIDESCENT_FRAG,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: options.side ?? THREE.DoubleSide,
+      uniforms: {
+        uTime: { value: 0 },
+        uIntensity: { value: options.intensity ?? 1.0 },
+        uHueShift: { value: options.hueShift ?? 0 },
+        uPaletteOffset: { value: new THREE.Vector3(offset[0], offset[1], offset[2]) },
+        uPaletteMode: { value: PALETTE_MODE_INDEX[palette] },
+        uMirage: { value: 0.5 },
+        uLevel: { value: 0 },
+        uTreble: { value: 0 },
+        uFresnelPower: { value: options.fresnelPower ?? 3.0 },
+        uRimBoost: { value: options.rimBoost ?? 1.6 },
+        uInnerWash: { value: options.innerWash ?? 0.35 },
+        uAlphaBase: { value: options.alphaBase ?? 0.0 },
+      },
+    });
+    // Material is rebuilt only on palette/side changes, which require a
+    // different uniform shape. Other props are mirrored via the effect below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [options.palette, options.side]);
+
+  useEffect(() => {
+    const offset = options.paletteOffset ?? DEFAULT_PALETTE_OFFSET;
+    const u = material.uniforms;
+    u.uIntensity.value = options.intensity ?? 1.0;
+    u.uHueShift.value = options.hueShift ?? 0;
+    (u.uPaletteOffset.value as THREE.Vector3).set(offset[0], offset[1], offset[2]);
+    u.uFresnelPower.value = options.fresnelPower ?? 3.0;
+    u.uRimBoost.value = options.rimBoost ?? 1.6;
+    u.uInnerWash.value = options.innerWash ?? 0.35;
+    u.uAlphaBase.value = options.alphaBase ?? 0.0;
+  }, [
+    material,
+    options.intensity,
+    options.hueShift,
+    options.paletteOffset,
+    options.fresnelPower,
+    options.rimBoost,
+    options.innerWash,
+    options.alphaBase,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      material.dispose();
+    };
+  }, [material]);
+
+  return material;
+}

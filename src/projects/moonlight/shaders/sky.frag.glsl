@@ -93,15 +93,11 @@ void main() {
   float idB = fract(vB.z * 1.7 + uTime * 0.13);
   vec3 cellTintB = mix(uTintC, uTintB, idB);
 
-  // Compose: sky base + slow cell glow + fast shimmer edges + sparkle dots.
+  // Compose: sky base + slow cell glow + fast shimmer edges.
   vec3 col = sky;
   col += cellTintA * coreA * (0.35 + uBass * 0.9 * uReactivity);
   col += cellTintB * edgeA * (0.25 + uMid * 0.8 * uReactivity);
   col += vec3(1.0, 0.95, 0.85) * edgeB * (0.18 + uTreble * 1.3 * uReactivity);
-
-  // Sparkle: tiny bright cores from the small voronoi, only on the brightest hits.
-  float sparkle = pow(1.0 - smoothstep(0.0, 0.12, vB.x), 8.0);
-  col += vec3(1.0, 0.92, 0.78) * sparkle * (uTreble * 1.4 + 0.05);
 
   // Fade out below horizon to fog so the ground/scene blends in.
   float belowFade = smoothstep(-0.05, 0.15, dir.y);

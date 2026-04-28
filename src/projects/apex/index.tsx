@@ -4,7 +4,7 @@ import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import type { ProjectComponentProps } from '../../types/project';
 import type { AudioBands } from '../../lib/useAudioAnalyser';
-import { useAudioAnalyser } from '../../lib/useAudioAnalyser';
+import { useAudioController } from '../../state/AudioProvider';
 import styles from './Apex.module.css';
 import vertexShader from './shaders/apex.vert.glsl?raw';
 import mirageFragmentShader from './shaders/apex.frag.glsl?raw';
@@ -501,7 +501,7 @@ function BleedScene({ bandsRef, controls, reduceMotion }: SceneProps) {
 function Apex({ width, height }: ProjectComponentProps) {
   const reduceMotion = usePrefersReducedMotion();
   const [controls, setControls] = useState<Controls>(DEFAULTS);
-  const audio = useAudioAnalyser();
+  const audio = useAudioController();
   const meterRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

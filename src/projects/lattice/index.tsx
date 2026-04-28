@@ -4,7 +4,8 @@ import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import type { ProjectComponentProps } from '../../types/project';
 import styles from './Lattice.module.css';
-import { useAudioAnalyser, type AudioBands } from '../../lib/useAudioAnalyser';
+import type { AudioBands } from '../../lib/useAudioAnalyser';
+import { useAudioController } from '../../state/AudioProvider';
 
 import seamVert from './shaders/seam.vert.glsl?raw';
 import seamFrag from './shaders/seam.frag.glsl?raw';
@@ -442,7 +443,7 @@ function Lattice({ width, height }: ProjectComponentProps) {
   const reduceMotion = usePrefersReducedMotion();
   const dims = useMemo(() => gridDimsFor(width, height), [width, height]);
   const [controls, setControls] = useState<Controls>(DEFAULTS);
-  const audio = useAudioAnalyser();
+  const audio = useAudioController();
   const meterRef = useRef<HTMLDivElement>(null);
   const pulseDecayRef = useRef(controls.pulseDecay);
 

@@ -3,7 +3,8 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { MeshReflectorMaterial, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import type { ProjectComponentProps } from '../../types/project';
-import { useAudioAnalyser, type AudioBands } from '../../lib/useAudioAnalyser';
+import type { AudioBands } from '../../lib/useAudioAnalyser';
+import { useAudioController } from '../../state/AudioProvider';
 import styles from './Luminal.module.css';
 import ringsVert from './shaders/floor-rings.vert.glsl?raw';
 import ringsFrag from './shaders/floor-rings.frag.glsl?raw';
@@ -456,7 +457,7 @@ const DEFAULT_CONTROLS: Controls = {
 
 function Luminal({ width, height }: ProjectComponentProps) {
   const [controls, setControls] = useState<Controls>(DEFAULT_CONTROLS);
-  const audio = useAudioAnalyser();
+  const audio = useAudioController();
   const meterRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

@@ -7,7 +7,8 @@ import crystalVert from './shaders/crystal.vert.glsl?raw';
 import crystalFrag from './shaders/crystal.frag.glsl?raw';
 import skyVert from './shaders/sky.vert.glsl?raw';
 import skyFrag from './shaders/sky.frag.glsl?raw';
-import { useAudioAnalyser, type AudioBands } from '../../lib/useAudioAnalyser';
+import type { AudioBands } from '../../lib/useAudioAnalyser';
+import { useAudioController } from '../../state/AudioProvider';
 
 interface Controls {
   count: number;
@@ -441,7 +442,7 @@ function mulberry32(seed: number): () => number {
 
 function Moonlight({ width, height }: ProjectComponentProps) {
   const [controls, setControls] = useState<Controls>(DEFAULT_CONTROLS);
-  const audio = useAudioAnalyser();
+  const audio = useAudioController();
   const meterRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

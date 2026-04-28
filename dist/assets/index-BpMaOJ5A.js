@@ -1,4 +1,4 @@
-import{j as a,r as i}from"./index-3TOd4URH.js";import{C as s,_ as c,S as l,$ as m,u as v}from"./react-three-fiber.esm-CSHYMaLq.js";const u=`varying vec3 vNormal;\r
+import{j as a,r as i}from"./index-Brqux3uL.js";import{C as s,J as c,S as l,K as m,u as v}from"./react-three-fiber.esm-Cfkc_fHU.js";const u=`varying vec3 vNormal;\r
 varying vec3 vViewDir;\r
 \r
 void main() {\r
