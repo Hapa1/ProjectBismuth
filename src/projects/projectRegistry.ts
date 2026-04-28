@@ -153,6 +153,17 @@ export const projectRegistry: RegistryEntry[] = [
   },
   {
     meta: {
+      id: 'wfc',
+      title: 'Wave Function Collapse',
+      year: 2026,
+      renderer: 'p5',
+      description: 'Procedural tile generation via WFC with preset tilesets and live sliders.',
+      tags: ['p5', 'procedural', 'wfc', 'controls'],
+    },
+    load: () => import('./wfc'),
+  },
+  {
+    meta: {
       id: 'geometry-beneath',
       title: 'Geometry Beneath Everything',
       year: 2026,
