@@ -323,8 +323,8 @@ export default function Gargantua({ width, height }: ProjectComponentProps) {
   const [controls, setControls] = useState<Controls>(initialControls);
   const reduceMotion = usePrefersReducedMotion();
 
-  // Cinematic initial camera position (slightly above the disk plane)
-  const initialPos: [number, number, number] = [0.0, 4.0, controls.cameraDistance];
+  // Cinematic initial camera position — near-equatorial for edge-on disk view
+  const initialPos: [number, number, number] = [0.0, 0.6, controls.cameraDistance];
 
   return (
     <div className={styles.root} style={{ width, height }}>
