@@ -124,7 +124,7 @@ vec3 starsBackground(vec3 dir) {
 }
 
 // ============================================================
-// Disk sampling — heat gradient + FBM turbulence + Doppler shift
+// Disk sampling — heat gradient + smooth swirl + Doppler
 // ============================================================
 vec3 hotColor(float t) {
   vec3 deep  = vec3(0.45, 0.02, 0.0);
@@ -136,110 +136,113 @@ vec3 hotColor(float t) {
   return mix(gold, white, (t - 0.66) / 0.34);
 }
 
-// Volumetric emissive sample.
-// Returns linear-light emission (no opacity) for a single point in space; the
-// raymarcher integrates this along the ray, so light naturally bleeds outward
-// into a soft glow instead of forming a hard slab.
-vec3 sampleDiskEmission(vec3 p, vec3 rayDir) {
+// Returns (col*bri, alpha) for a point on the disk midplane.
+// Noise is in seam-free Cartesian+log space — no atan2 wrap seam,
+// no harsh pow() quantisation, just a gentle swirl multiplier.
+vec4 sampleDisk(vec3 p, vec3 rayDir) {
   float r     = length(p.xz);
-  float y     = p.y;
-
-  // Smooth radial profile: bright peak just outside uDiskInner, soft falls off
-  // toward both edges. Built from two smoothsteps so there are no hard rings.
-  float inner = smoothstep(uDiskInner * 0.7, uDiskInner * 1.15, r);
-  float outer = 1.0 - smoothstep(uDiskOuter * 0.55, uDiskOuter * 1.05, r);
-  float radial = inner * outer;
-  if (radial <= 0.0) return vec3(0.0);
-
-  // Vertical Gaussian: thickness scales with radius (thin near the BH, puffier outside).
-  // This gives the disk a smooth volumetric body — grazing rays no longer hit a slab.
-  float thickness = mix(0.10, 0.45, smoothstep(uDiskInner, uDiskOuter, r)) * uMass;
-  float vert      = exp(-(y * y) / (thickness * thickness));
-
-  // Normalised radius for colour / brightness curves.
   float rNorm = clamp((r - uDiskInner) / max(uDiskOuter - uDiskInner, 0.001), 0.0, 1.0);
 
-  // Whisper of turbulence — sampled in seam-free Cartesian space, rotated by spin.
-  float spin = uTime * uDiskSpin;
-  float cs   = cos(spin);
-  float sn   = sin(spin);
-  vec2  pxz  = vec2(p.x * cs - p.z * sn, p.x * sn + p.z * cs);
-  float n    = fbm(pxz * 0.6 + vec2(uTime * 0.2, 0.0));
-  // Map noise to a gentle multiplier in [0.75, 1.25] — never enough to clump.
-  float swirl = mix(0.75, 1.25, smoothstep(0.25, 0.75, n));
+  // Wide smooth radial envelope — no hard inner/outer rings
+  float radial = smoothstep(0.0, 0.18, rNorm) * smoothstep(1.0, 0.72, rNorm);
+  if (radial < 0.001) return vec4(0.0);
 
-  // Heat / colour (hot inner, cool outer).
-  float heat = pow(1.0 - rNorm, mix(1.8, 0.9, uDiskTemp));
+  // Seam-free swirl using Cartesian+log coords
+  float spin = uTime * uDiskSpin;
+  float cs   = cos(spin), sn = sin(spin);
+  vec2  rot  = vec2(p.x * cs - p.z * sn, p.x * sn + p.z * cs);
+  float lr   = log(max(r, 0.1)) * 3.0 - uTime * 0.28;
+  float n    = fbm(rot * 0.55 + vec2(lr, lr * 0.4));
+  // Gentle swirl multiplier [0.72, 1.28] — no chunky clamping
+  float swirl = mix(0.72, 1.28, smoothstep(0.3, 0.7, n));
+
+  // Heat gradient — inner white-hot, outer deep red
+  float heat = pow(1.0 - rNorm, mix(2.0, 1.0, uDiskTemp));
   vec3  col  = hotColor(heat);
 
-  // Brightness — strong inner peak, gentle outer halo. Inverse-r adds a glow
-  // that bleeds beyond the geometric body of the disk.
-  float bri = (0.6 + 1.6 * pow(1.0 - rNorm, 1.6)) * radial * vert * swirl;
-  bri      += 0.18 * radial / (0.05 + rNorm);          // inner halo bleed
-  bri      += 0.30 * exp(-abs(y) / (thickness * 1.8))  // outer puff above/below
-              * radial * uTurbulence * 0.5;
+  // Brightness: inner peak + turbulence
+  float bri = (1.5 * pow(1.0 - rNorm, 1.6) + 0.25) * radial;
+  bri      *= mix(1.0, swirl, uTurbulence);
 
   // Doppler beaming
   vec3  orbit   = normalize(vec3(-p.z, 0.0, p.x));
   float doppler = dot(orbit, -rayDir);
   float dShift  = 1.0 + doppler * uDopplerStrength * (1.0 - rNorm * 0.6);
-  bri          *= clamp(dShift * dShift, 0.2, 4.5);
+  bri          *= clamp(dShift * dShift, 0.15, 4.5);
   col          *= mix(vec3(1.05, 0.95, 0.85), vec3(0.85, 0.95, 1.10),
                       0.5 + 0.5 * doppler);
 
-  return col * bri * uDiskBrightness * uDiskOpacity * 0.18;
+  return vec4(col * bri * uDiskBrightness, radial * uDiskOpacity);
 }
 
 // ============================================================
 // Raymarcher
 // ============================================================
 vec3 traceRay(vec3 ro, vec3 rd) {
-  vec3  pos    = ro;
-  vec3  vel    = rd;
-  vec3  accum  = vec3(0.0);
-  bool  ate    = false;     // crossed event horizon
+  vec3  pos   = ro;
+  vec3  vel   = rd;
+  vec3  accum = vec3(0.0);
+  float opa   = 0.0;
+  bool  ate   = false;
 
-  float Rs    = uMass;
-  float Rs2   = Rs * Rs;
+  float Rs  = uMass;
+  float Rs2 = Rs * Rs;
 
   for (int i = 0; i < MAX_STEP; i++) {
     if (i >= uSteps) break;
 
     float r = length(pos);
-
-    // Event horizon — absorb the ray
-    if (r < Rs) { ate = true; break; }
-    // Escape — let the ray hit the starfield with whatever direction it has
+    if (r < Rs)   { ate = true; break; }
     if (r > 90.0) break;
 
-    // Adaptive step: small near the BH, large far from it
     float dt = clamp(r * 0.18, 0.04, 1.6);
 
-    // Gravitational pull (1/r^2 toward origin). uLensStrength scales the bend.
+    // Gravity
     vec3  toBH = -pos / max(r, 1e-4);
     float pull = uLensStrength * Rs2 / max(r * r, 1e-4);
     vel += toBH * pull * dt;
 
-    // Photon-ring brightening — light tracing close to ~1.5 Rs glows
-    float photonR = 1.5 * Rs;
-    float pd      = abs(r - photonR);
+    // Photon ring glow
+    float pd = abs(r - 1.5 * Rs);
     if (pd < 0.18 * Rs) {
-      float falloff = 1.0 - pd / (0.18 * Rs);
-      accum += vec3(1.0, 0.78, 0.32) * uPhotonIntensity * 0.05 * falloff;
+      float fo = 1.0 - pd / (0.18 * Rs);
+      accum += vec3(1.0, 0.78, 0.32) * uPhotonIntensity * 0.05 * fo;
     }
 
-    // Volumetric disk: emissive contribution every step. Because the disk has
-    // radial AND vertical extent, light bleeds outward to form a soft glow
-    // instead of a hard slab. Using midpoint of the step keeps it stable.
-    vec3 mid = pos + vel * (dt * 0.5);
-    accum   += sampleDiskEmission(mid, normalize(vel)) * dt;
+    vec3 newPos = pos + vel * dt;
 
-    pos += vel * dt;
+    // ── Hard disk slab crossing (provides disk definition) ─────────
+    if (sign(pos.y) != sign(newPos.y) && opa < 0.99) {
+      float t   = -pos.y / (vel.y + sign(vel.y) * 1e-5);
+      vec3  hit = pos + vel * t;
+      float hr  = length(hit.xz);
+      if (hr > uDiskInner * 0.75 && hr < uDiskOuter * 1.15) {
+        vec4 d = sampleDisk(hit, normalize(vel));
+        accum += d.rgb * (1.0 - opa);
+        opa   += d.a   * (1.0 - opa);
+      }
+    }
+
+    // ── Soft vertical glow halo (provides the bleed / corona) ──────
+    // Sample the disk at this xz position and weight by a narrow Gaussian in y.
+    // The `0.04 * dt` scale keeps it as a soft bleed, not a fog filling.
+    {
+      float hr = length(pos.xz);
+      if (hr > uDiskInner * 0.75 && hr < uDiskOuter * 1.15 && opa < 0.99) {
+        float hw    = Rs * mix(0.20, 0.55, smoothstep(uDiskInner, uDiskOuter, hr));
+        float yFall = exp(-(pos.y * pos.y) / (hw * hw));
+        if (yFall > 0.01) {
+          vec4 d = sampleDisk(vec3(pos.x, 0.0, pos.z), normalize(vel));
+          accum += d.rgb * yFall * dt * 0.04 * (1.0 - opa);
+        }
+      }
+    }
+
+    pos = newPos;
   }
 
-  // Background stars fill whatever's left
   if (!ate) {
-    accum += starsBackground(normalize(vel));
+    accum += starsBackground(normalize(vel)) * (1.0 - opa);
   }
 
   return accum;
