@@ -104,7 +104,6 @@ function ExpanseAnimated({ width, height }: ProjectComponentProps) {
         p.setup = () => {
           p.createCanvas(width, height);
           p.pixelDensity(Math.min(window.devicePixelRatio, 2));
-          p.noSmooth();
         };
 
         p.draw = () => {
@@ -427,10 +426,20 @@ function SelectControl({ label, value, options, onChange }: SelectControlProps) 
   );
 }
 
+interface CellData {
+  x: number;
+  y: number;
+  noiseBaseX: number;
+  noiseBaseY: number;
+  sx: number;
+  sy: number;
+  z: number;
+  paletteBand: number;
+}
+
 function drawExpanse(p: P5, width: number, height: number, controls: Controls) {
   const t = controls.animate ? p.millis() * 0.001 * controls.speed : 0;
   const seed = hashSeed(controls.seed);
-  const rng = mulberry32(seed);
   p.noiseSeed(seed);
 
   const scale = (Math.min(width, height) / 1500) * controls.zoom;
@@ -440,6 +449,7 @@ function drawExpanse(p: P5, width: number, height: number, controls: Controls) {
   const rows = Math.max(8, Math.floor(totalDim / controls.cellSize));
   const cw = totalDim / cols;
   const ch = totalDim / rows;
+  const extrusionScale = cw / 14;
 
   const paletteNames: PaletteName[] = [
     controls.paletteMain,
@@ -448,26 +458,22 @@ function drawExpanse(p: P5, width: number, height: number, controls: Controls) {
   ];
   const levels = [controls.mainLevels, controls.secondaryLevels, controls.contrastLevels];
 
-  p.background('#e5dfcf');
-  p.push();
-  p.translate(width / 2, height / 2);
+  // Pass 1: pre-compute all cell data in row-major order.
+  // Using a position-based hash for palette randomisation lets us compute in
+  // any order without depending on sequential RNG call order.
+  const cells: CellData[][] = [];
+  const rawZ: number[][] = [];
+  const rawSx: number[][] = [];
+  const rawSy: number[][] = [];
 
-  // Hoist sun — it doesn't change per-tile.
-  const sun = getSunPosition(p, width, height, controls);
-
-  // Correct isometric painter's algorithm: iterate diagonals (xi+yi) from
-  // furthest to nearest. Within each diagonal draw xi high→low so that a
-  // tile's left face is always painted before the neighbouring tile whose
-  // top sits at that same boundary.
-  const maxD = cols + rows - 2;
-  for (let d = maxD; d >= 0; d -= 1) {
-    const xiStart = Math.min(cols - 1, d);
-    const xiEnd = Math.max(0, d - (rows - 1));
-    for (let xi = xiStart; xi >= xiEnd; xi -= 1) {
-      const yi = d - xi;
+  for (let yi = 0; yi < rows; yi++) {
+    cells[yi] = [];
+    rawZ[yi] = [];
+    rawSx[yi] = [];
+    rawSy[yi] = [];
+    for (let xi = 0; xi < cols; xi++) {
       const x = -totalDim / 2 + xi * cw;
       const y = -totalDim / 2 + yi * ch;
-
       const noiseBaseX = (x + 1400 + seed * 0.00001) * controls.noiseScale * 0.02;
       const noiseBaseY = (y + 1400 + seed * 0.00002) * controls.noiseScale * 0.02;
       const n = p.noise(noiseBaseX, noiseBaseY, t * 0.35);
@@ -483,11 +489,46 @@ function drawExpanse(p: P5, width: number, height: number, controls: Controls) {
         controls.slopeRange *
         ch *
         nHeight;
-      const extrusionScale = cw / 14;
       const z = (Math.abs(sx) + Math.abs(sy) + controls.heightRange * nHeight) * extrusionScale;
 
-      const randomBand = p.noise(noiseBaseX + rng(), noiseBaseY + rng(), 0.1);
+      // Position-based colour randomisation (no sequential RNG dependency).
+      const rx = cellHash(xi, yi, seed);
+      const ry = cellHash(xi + 997, yi + 1999, seed);
+      const randomBand = p.noise(noiseBaseX + rx, noiseBaseY + ry, 0.1);
       const paletteBand = randomBand < 0.62 ? 0 : randomBand < 0.9 ? 1 : 2;
+
+      cells[yi][xi] = { x, y, noiseBaseX, noiseBaseY, sx, sy, z, paletteBand };
+      rawZ[yi][xi] = z;
+      rawSx[yi][xi] = sx;
+      rawSy[yi][xi] = sy;
+    }
+  }
+
+  // Pass 2: blur height and slope grids so neighbouring tiles blend smoothly.
+  // Radius 2 averages over a 5×5 neighbourhood, eliminating the sharp exposed
+  // side faces that appear when adjacent tiles differ by even a small amount.
+  const smoothZ = applyBoxBlur(rawZ, rows, cols, 2);
+  const smoothSx = applyBoxBlur(rawSx, rows, cols, 1);
+  const smoothSy = applyBoxBlur(rawSy, rows, cols, 1);
+
+  p.background('#e5dfcf');
+  p.push();
+  p.translate(width / 2, height / 2);
+
+  const sun = getSunPosition(p, width, height, controls);
+
+  // Pass 3: painter's algorithm — diagonal order, far to near.
+  const maxD = cols + rows - 2;
+  for (let d = maxD; d >= 0; d -= 1) {
+    const xiStart = Math.min(cols - 1, d);
+    const xiEnd = Math.max(0, d - (rows - 1));
+    for (let xi = xiStart; xi >= xiEnd; xi -= 1) {
+      const yi = d - xi;
+      const { x, y, paletteBand } = cells[yi][xi];
+      const z = smoothZ[yi][xi];
+      const sx = smoothSx[yi][xi];
+      const sy = smoothSy[yi][xi];
+
       const palette = PALETTES[paletteNames[paletteBand]];
       const paletteLevels = levels[paletteBand];
 
@@ -510,7 +551,6 @@ function drawExpanse(p: P5, width: number, height: number, controls: Controls) {
         shapeTop[1],
       ];
 
-      // Side faces first so the top always paints over them.
       drawShape(p, basis, shapeLeft, sun, palette, paletteLevels, controls.gamma, controls.outline, 0.86);
       drawShape(p, basis, shapeRight, sun, palette, paletteLevels, controls.gamma, controls.outline, 0.7);
       drawShape(p, basis, shapeTop, sun, palette, paletteLevels, controls.gamma, controls.outline, 1.05);
@@ -644,6 +684,35 @@ function clamp01(v: number): number {
   return Math.min(1, Math.max(0, v));
 }
 
+function applyBoxBlur(grid: number[][], rows: number, cols: number, radius: number): number[][] {
+  const result: number[][] = Array.from({ length: rows }, () => new Array<number>(cols).fill(0));
+  for (let yi = 0; yi < rows; yi++) {
+    for (let xi = 0; xi < cols; xi++) {
+      let sum = 0;
+      let count = 0;
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          const ny = yi + dy;
+          const nx = xi + dx;
+          if (ny >= 0 && ny < rows && nx >= 0 && nx < cols) {
+            sum += grid[ny][nx];
+            count++;
+          }
+        }
+      }
+      result[yi][xi] = sum / count;
+    }
+  }
+  return result;
+}
+
+function cellHash(xi: number, yi: number, seed: number): number {
+  let h = ((seed ^ (xi * 2654435761)) ^ (yi * 1234567891)) >>> 0;
+  h = (Math.imul(h ^ (h >>> 16), 0x45d9f3b)) >>> 0;
+  h = (Math.imul(h ^ (h >>> 16), 0x45d9f3b)) >>> 0;
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
 function hashSeed(seed: string): number {
   let h = 2166136261;
   for (let i = 0; i < seed.length; i += 1) {
@@ -651,17 +720,6 @@ function hashSeed(seed: string): number {
     h = Math.imul(h, 16777619);
   }
   return h >>> 0;
-}
-
-function mulberry32(seed: number): () => number {
-  let state = seed >>> 0;
-  return () => {
-    state = (state + 0x6d2b79f5) >>> 0;
-    let t = state;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
 }
 
 function createSeed(): string {

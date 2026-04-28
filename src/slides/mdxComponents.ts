@@ -3,14 +3,17 @@ import { SlideDemo } from '../components/slides/SlideDemo';
 import { SlideOverlay } from '../components/slides/SlideOverlay';
 import { SlideTitle, SlideEyebrow, SlideBody } from '../components/slides/SlideText';
 import { SlidePlaceholder } from '../components/slides/SlidePlaceholder';
+import { SlidePrompt } from '../components/slides/SlidePrompt';
+import { SlideCode } from '../components/slides/SlideCode';
+import { SlideCompare } from '../components/slides/SlideCompare';
 import { SymbolWall } from '../components/slides/SymbolWall';
 import { SymbolExhibits } from '../components/slides/exhibits/SymbolExhibits';
 
 /**
  * Components automatically available inside any slide MDX file. Authors can
  * use <Demo>, <Placeholder>, <SymbolWall>, <SymbolExhibits>, <Overlay>,
- * <Title>, <Eyebrow>, and <Body> with no per-file imports thanks to
- * MDXProvider in SlideshowView.
+ * <Title>, <Eyebrow>, <Body>, <Prompt>, <Code>, and <Compare> with no
+ * per-file imports thanks to MDXProvider in SlideshowView.
  */
 export const slideMdxComponents: MDXComponents = {
   Demo: SlideDemo,
@@ -21,4 +24,7 @@ export const slideMdxComponents: MDXComponents = {
   Title: SlideTitle,
   Eyebrow: SlideEyebrow,
   Body: SlideBody,
+  Prompt: SlidePrompt,
+  Code: SlideCode,
+  Compare: SlideCompare,
 };

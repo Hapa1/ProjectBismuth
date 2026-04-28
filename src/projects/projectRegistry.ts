@@ -118,6 +118,28 @@ export const projectRegistry: RegistryEntry[] = [
     },
     load: () => import('./prismata'),
   },
+  {
+    meta: {
+      id: 'polyhedra',
+      title: 'Polyhedra',
+      year: 2026,
+      renderer: 'three',
+      description: 'Platonic solids with sliders for shape, size, rotation, hue, and wireframe.',
+      tags: ['three', 'geometry', 'controls'],
+    },
+    load: () => import('./polyhedra'),
+  },
+  {
+    meta: {
+      id: 'gargantua',
+      title: 'Gargantua',
+      year: 2026,
+      renderer: 'three',
+      description: 'Cinematic black hole with glowing accretion disk, gravitational lensing, and bloom.',
+      tags: ['three', 'shader', 'space'],
+    },
+    load: () => import('./gargantua'),
+  },
 ];
 
 /** Returns a React.lazy component for the given project id. */

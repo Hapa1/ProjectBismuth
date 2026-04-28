@@ -1,0 +1,148 @@
+.wrap {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(1rem, 2vw, 1.75rem);
+  padding: clamp(1rem, 3vw, 2.5rem);
+  overflow-y: auto;
+  /* Allow MDX text inside children to flow naturally. */
+  color: var(--color-text);
+}
+
+.headline {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: clamp(1.2rem, 0.9rem + 1.6vw, 2rem);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+  max-width: 28ch;
+  /* Clear the fixed menu button on mobile (top: 1rem, left: 1rem, ~44px wide). */
+  padding-left: 3.5rem;
+}
+
+@media (min-width: 1024px) {
+  .headline {
+    padding-left: 0;
+  }
+}
+
+.grid {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Every column needs a positioning context (the demo uses absolute fill)
+   and a guaranteed minimum height on mobile where flex items don't
+   inherit a parent height. */
+.grid > * {
+  position: relative;
+  min-height: clamp(140px, 20dvh, 240px);
+}
+
+/* Mobile: the demo cell (3rd child) gets the lion's share of vertical
+   space so the canvas reads as the hero. Higher specificity than the
+   generic rule above because of the extra :nth-child selector. */
+.grid > :nth-child(3) {
+  min-height: clamp(360px, 60dvh, 560px);
+}
+
+/* Mobile arrow between stacked panels */
+.grid > * + *::before {
+  content: '↓';
+  display: block;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 1.25rem;
+  color: rgba(167, 139, 250, 0.55);
+  margin: -0.25rem 0 0.5rem;
+  line-height: 1;
+}
+
+@media (min-width: 1024px) {
+  .grid[data-layout='row'] {
+    flex-direction: row;
+    align-items: stretch;
+    gap: clamp(0.75rem, 1.5vw, 1.5rem);
+  }
+
+  .grid[data-layout='row'] > * {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  /* Desktop arrow: sits in the gap to the LEFT of each non-first column. */
+  .grid[data-layout='row'] > * + *::before {
+    content: '→';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translate(calc(-50% - clamp(0.375rem, 0.75vw, 0.75rem) / 2), -50%);
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 1.6rem;
+    line-height: 1;
+    color: rgba(167, 139, 250, 0.55);
+    pointer-events: none;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Split layout: children 1+2 stacked left, child 3 spans rows right. */
+  /*                                                                    */
+  /*   ┌─ child 1 ─┐──→──┐                                              */
+  /*   │           │     │                                              */
+  /*   ├─ child 2 ─┤  child 3                                           */
+  /*   │           │──→──┘                                              */
+  /*   └───────────┘                                                    */
+  /*                                                                    */
+  /* Used by slide 2: Code and Prompt both feed one shared Demo.        */
+  /* ------------------------------------------------------------------ */
+  .grid[data-layout='split'] {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+    grid-template-rows: 1fr 1fr;
+    grid-template-areas:
+      'a c'
+      'b c';
+    gap: clamp(0.75rem, 1.5vw, 1.5rem);
+    flex: 1 1 auto;
+    min-height: clamp(420px, 70dvh, 720px);
+  }
+
+  .grid[data-layout='split'] > * {
+    margin: 0;
+    min-height: 0;
+    min-width: 0;
+  }
+
+  .grid[data-layout='split'] > :nth-child(1) { grid-area: a; }
+  .grid[data-layout='split'] > :nth-child(2) { grid-area: b; }
+  .grid[data-layout='split'] > :nth-child(3) { grid-area: c; }
+
+  /* Replace mobile ↓ arrows with → arrows pointing into the demo. */
+  .grid[data-layout='split'] > :nth-child(1)::after,
+  .grid[data-layout='split'] > :nth-child(2)::after {
+    content: '→';
+    position: absolute;
+    right: calc(-1 * clamp(0.75rem, 1.5vw, 1.5rem) / 2);
+    top: 50%;
+    transform: translate(50%, -50%);
+    font-family: var(--font-mono);
+    font-size: 1.6rem;
+    line-height: 1;
+    color: rgba(167, 139, 250, 0.55);
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .grid[data-layout='split'] > * + *::before {
+    content: none;
+  }
+}

@@ -17,7 +17,11 @@ uniform int   uPulseCount;
 uniform vec2  uPulsePos[MAX_PULSES];
 uniform float uPulseI[MAX_PULSES];
 uniform float uPulseHue[MAX_PULSES];
+uniform float uPulseAge[MAX_PULSES];
 uniform float uPulseRadius;
+// 0 = glow (immediate gaussian), 1 = ripple (ring that travels outward).
+uniform float uPulseMode;
+uniform float uPulseSpeed;
 
 varying vec2 vUv;
 varying vec2 vWorldXY;
@@ -55,13 +59,24 @@ void main() {
   float ar = max(uPulseRadius, 0.001);
   vec3 pulseColor = vec3(0.0);
   float pulseSpot = 0.0;
+  bool ripple = uPulseMode > 0.5;
   for (int i = 0; i < MAX_PULSES; i++) {
     if (i >= uPulseCount) break;
     float ai = uPulseI[i];
     if (ai <= 0.001) continue;
     float ad = length(vWorldXY - uPulsePos[i]);
-    // Slightly larger / softer falloff for pulses so they read as wide flashes.
-    float spot = exp(-(ad * ad) / (ar * ar)) * ai;
+    float spot;
+    if (ripple) {
+      // Ring whose radius grows with age. Reuse uPulseRadius as ring thickness.
+      float front = uPulseAge[i] * uPulseSpeed;
+      float diff = ad - front;
+      // Suppress the ring before it has actually formed (no light at origin
+      // immediately). A small ramp prevents a "spawn flash" at d≈0.
+      float emerge = smoothstep(0.0, ar * 0.6, front);
+      spot = exp(-(diff * diff) / (ar * ar)) * ai * emerge;
+    } else {
+      spot = exp(-(ad * ad) / (ar * ar)) * ai;
+    }
     pulseSpot += spot;
     // Each pulse picks a hue offset; saturate strongly.
     vec3 hue = hsv2rgb(vec3(fract(uPulseHue[i]), 0.85, 1.0));

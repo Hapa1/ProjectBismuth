@@ -1,5 +1,0 @@
-import{u as h,j as e}from"./index-DcEJArLt.js";const d={id:"why-symbols-repeat",title:"Why These Symbols Repeat"};function c(t){const o={p:"p",...h(),...t.components},{Body:r,Eyebrow:s,Overlay:i,Placeholder:a,Title:l}=o;return r||n("Body"),s||n("Eyebrow"),i||n("Overlay"),a||n("Placeholder"),l||n("Title"),e.jsxs(e.Fragment,{children:[e.jsx(a,{shape:"symbol-wall-annotated",caption:"Demo: symbols annotated with the pillars they encode"}),`
-`,e.jsxs(i,{position:"bottom-right",children:[e.jsx(s,{children:"The Answer"}),e.jsx(l,{children:"Why These Symbols Repeat"}),e.jsx(r,{children:e.jsx(o.p,{children:`Sacred symbols are not one-to-one labels for natural patterns. A single\r
-symbol often carries several of the same ideas at once — repetition,\r
-proportion, symmetry. The people who drew them were recording the shapes\r
-that kept proving meaningful, stable, and beautiful.`})})]})]})}function m(t={}){const{wrapper:o}={...h(),...t.components};return o?e.jsx(o,{...t,children:e.jsx(c,{...t})}):c(t)}function n(t,o){throw new Error("Expected component `"+t+"` to be defined: you likely forgot to import, pass, or provide it.")}export{m as default,d as meta};

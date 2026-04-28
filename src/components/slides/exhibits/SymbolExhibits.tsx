@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { EXHIBITS } from './registry';
 import { Slider } from '../../../lib/controls';
+import { useSlideContext } from '../SlideContext';
 import styles from './SymbolExhibits.module.css';
 
 /**
@@ -15,6 +16,7 @@ import styles from './SymbolExhibits.module.css';
  * slide is active so background slides don't run a render loop.
  */
 export function SymbolExhibits() {
+  const { isActive } = useSlideContext();
   const [activeId, setActiveId] = useState<string>(EXHIBITS[0]?.id ?? '');
   const [showImage, setShowImage] = useState(true);
   const [showControls, setShowControls] = useState(true);
@@ -122,16 +124,18 @@ export function SymbolExhibits() {
         {/* Detail */}
         <section className={styles.detail} aria-live="polite">
           <div className={styles.viewport}>
-            <Canvas
-              key={active.id}
-              className={styles.canvas}
-              gl={{ antialias: true, powerPreference: 'high-performance' }}
-              dpr={[1, Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 2)]}
-              camera={{ position: [0, 0, 4], fov: 50 }}
-            >
-              <color attach="background" args={['#0a0a0a']} />
-              {active.render({ params })}
-            </Canvas>
+            {isActive && (
+              <Canvas
+                key={active.id}
+                className={styles.canvas}
+                gl={{ antialias: true, powerPreference: 'high-performance' }}
+                dpr={[1, Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, 2)]}
+                camera={{ position: [0, 0, 4], fov: 50 }}
+              >
+                <color attach="background" args={['#0a0a0a']} />
+                {active.render({ params })}
+              </Canvas>
+            )}
 
               {!showImage && (
                 <button

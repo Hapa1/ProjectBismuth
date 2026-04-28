@@ -37,6 +37,8 @@ function usePrefersReducedMotion(): boolean {
 // Controls
 // ---------------------------------------------------------------------------
 
+type PulseMode = 'glow' | 'ripple';
+
 interface Controls {
   audioGain: number;
   smoothing: number;
@@ -46,6 +48,8 @@ interface Controls {
   pulseDecay: number;
   pointerRadius: number;
   bloomIntensity: number;
+  pulseMode: PulseMode;
+  pulseSpeed: number;
 }
 
 const DEFAULTS: Controls = {
@@ -57,6 +61,8 @@ const DEFAULTS: Controls = {
   pulseDecay: 1.4,
   pointerRadius: 2.6,
   bloomIntensity: 1.25,
+  pulseMode: 'ripple',
+  pulseSpeed: 8.0,
 };
 
 // ---------------------------------------------------------------------------
@@ -67,6 +73,7 @@ interface Pulse {
   pos: THREE.Vector2;
   intensity: number;
   hue: number;
+  age: number;
 }
 
 interface PointerState {
@@ -176,6 +183,7 @@ function Seams({ dims, reduceMotion, sharedRef, controls, pulseDecayRef }: Seams
     const pulsePos = new Array(MAX_PULSES).fill(0).map(() => new THREE.Vector2(0, 0));
     const pulseI = new Float32Array(MAX_PULSES);
     const pulseHue = new Float32Array(MAX_PULSES);
+    const pulseAge = new Float32Array(MAX_PULSES);
     return new THREE.ShaderMaterial({
       vertexShader: seamVert,
       fragmentShader: seamFrag,
@@ -189,7 +197,10 @@ function Seams({ dims, reduceMotion, sharedRef, controls, pulseDecayRef }: Seams
         uPulsePos: { value: pulsePos },
         uPulseI: { value: pulseI },
         uPulseHue: { value: pulseHue },
+        uPulseAge: { value: pulseAge },
         uPulseRadius: { value: controls.pulseRadius },
+        uPulseMode: { value: controls.pulseMode === 'ripple' ? 1 : 0 },
+        uPulseSpeed: { value: controls.pulseSpeed },
       },
       transparent: true,
       depthWrite: false,
@@ -209,6 +220,11 @@ function Seams({ dims, reduceMotion, sharedRef, controls, pulseDecayRef }: Seams
     vMaterial.uniforms.uPulseRadius.value = controls.pulseRadius;
     hMaterial.uniforms.uIntensity.value = controls.reactivity;
     vMaterial.uniforms.uIntensity.value = controls.reactivity;
+    const modeVal = controls.pulseMode === 'ripple' ? 1 : 0;
+    hMaterial.uniforms.uPulseMode.value = modeVal;
+    vMaterial.uniforms.uPulseMode.value = modeVal;
+    hMaterial.uniforms.uPulseSpeed.value = controls.pulseSpeed;
+    vMaterial.uniforms.uPulseSpeed.value = controls.pulseSpeed;
   }, [controls, hMaterial, vMaterial]);
 
   useEffect(() => {
@@ -280,6 +296,7 @@ function Seams({ dims, reduceMotion, sharedRef, controls, pulseDecayRef }: Seams
     const pulses = shared.pulses;
     for (let i = pulses.length - 1; i >= 0; i -= 1) {
       pulses[i].intensity -= decay * dt;
+      pulses[i].age += dt;
       if (pulses[i].intensity <= 0) {
         pulses.splice(i, 1);
       }
@@ -290,9 +307,11 @@ function Seams({ dims, reduceMotion, sharedRef, controls, pulseDecayRef }: Seams
     const hPosArr = hMaterial.uniforms.uPulsePos.value as THREE.Vector2[];
     const hIArr = hMaterial.uniforms.uPulseI.value as Float32Array;
     const hHueArr = hMaterial.uniforms.uPulseHue.value as Float32Array;
+    const hAgeArr = hMaterial.uniforms.uPulseAge.value as Float32Array;
     const vPosArr = vMaterial.uniforms.uPulsePos.value as THREE.Vector2[];
     const vIArr = vMaterial.uniforms.uPulseI.value as Float32Array;
     const vHueArr = vMaterial.uniforms.uPulseHue.value as Float32Array;
+    const vAgeArr = vMaterial.uniforms.uPulseAge.value as Float32Array;
     for (let i = 0; i < count; i += 1) {
       const p = pulses[i];
       hPosArr[i].copy(p.pos);
@@ -301,6 +320,8 @@ function Seams({ dims, reduceMotion, sharedRef, controls, pulseDecayRef }: Seams
       vIArr[i] = p.intensity;
       hHueArr[i] = p.hue;
       vHueArr[i] = p.hue;
+      hAgeArr[i] = p.age;
+      vAgeArr[i] = p.age;
     }
     hMaterial.uniforms.uPulseCount.value = count;
     vMaterial.uniforms.uPulseCount.value = count;
@@ -382,8 +403,10 @@ function BeatDriver({ bandsRef, sharedRef, dims, controls }: BeatDriverProps) {
       const pulses = sharedRef.current.pulses;
       if (pulses.length >= MAX_PULSES) pulses.shift();
 
-      const x = (Math.random() * 2 - 1) * dims.worldHalfW * 0.85;
-      const y = (Math.random() * 2 - 1) * dims.worldHalfH * 0.85;
+      // Ripple mode emanates from the center; glow mode scatters randomly.
+      const ripple = controls.pulseMode === 'ripple';
+      const x = ripple ? 0 : (Math.random() * 2 - 1) * dims.worldHalfW * 0.85;
+      const y = ripple ? 0 : (Math.random() * 2 - 1) * dims.worldHalfH * 0.85;
 
       const energy = transient
         ? Math.max(b.bass, fastEnv.current - slowEnv.current)
@@ -395,6 +418,7 @@ function BeatDriver({ bandsRef, sharedRef, dims, controls }: BeatDriverProps) {
         pos: new THREE.Vector2(x, y),
         intensity,
         hue: hueSeed.current,
+        age: 0,
       });
     }
   });
@@ -638,6 +662,25 @@ function Lattice({ width, height }: ProjectComponentProps) {
 
         <section className={styles.section}>
           <p className={styles.sectionTitle}>Light</p>
+          <div className={styles.row} style={{ gridTemplateColumns: '1fr' }}>
+            <span className={styles.label}>Pulse Mode</span>
+          </div>
+          <div className={styles.audioGrid}>
+            <button
+              type="button"
+              className={`${styles.button} ${controls.pulseMode === 'glow' ? styles.buttonActive : ''}`}
+              onClick={() => setControls((c) => ({ ...c, pulseMode: 'glow' }))}
+            >
+              Glow
+            </button>
+            <button
+              type="button"
+              className={`${styles.button} ${controls.pulseMode === 'ripple' ? styles.buttonActive : ''}`}
+              onClick={() => setControls((c) => ({ ...c, pulseMode: 'ripple' }))}
+            >
+              Ripple
+            </button>
+          </div>
           <Slider
             label="Pointer Radius"
             min={0.5}
@@ -647,13 +690,23 @@ function Lattice({ width, height }: ProjectComponentProps) {
             onChange={(v) => setControls((c) => ({ ...c, pointerRadius: v }))}
           />
           <Slider
-            label="Pulse Radius"
+            label={controls.pulseMode === 'ripple' ? 'Ring Thickness' : 'Pulse Radius'}
             min={0.5}
             max={8}
             step={0.05}
             value={controls.pulseRadius}
             onChange={(v) => setControls((c) => ({ ...c, pulseRadius: v }))}
           />
+          {controls.pulseMode === 'ripple' && (
+            <Slider
+              label="Ripple Speed"
+              min={1}
+              max={30}
+              step={0.1}
+              value={controls.pulseSpeed}
+              onChange={(v) => setControls((c) => ({ ...c, pulseSpeed: v }))}
+            />
+          )}
           <Slider
             label="Pulse Decay"
             min={0.3}

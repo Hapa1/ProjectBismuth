@@ -1,0 +1,6 @@
+import{u as d,j as e}from"./index-CFoTI59D.js";const p={id:"v2-workflow",title:"The New Creative Workflow"};function l(o){const r={p:"p",...d(),...o.components},{Body:n,Demo:i,Eyebrow:s,Overlay:c,Title:a}=r;return n||t("Body"),i||t("Demo"),s||t("Eyebrow"),c||t("Overlay"),a||t("Title"),e.jsxs(e.Fragment,{children:[e.jsx(i,{projectId:"apex"}),`
+`,e.jsxs(c,{position:"bottom-left",children:[e.jsx(s,{children:"Workflow"}),e.jsx(a,{children:"Idea → Concept → Code → Personalize"}),e.jsx(n,{children:e.jsxs(r.p,{children:["Start with an idea: ",e.jsx("em",{children:'"A cosmic mandala that reacts to music."'}),` Ask\r
+AI what math could create it. Generate starter code. Modify visually:\r
+darker, slower, more symmetrical.`]})}),e.jsx(n,{children:e.jsx(r.p,{children:`Then learn the code — line by line — and personalize. Your colors, your\r
+references, your music, your timing, your glitches. Export, share, project,\r
+perform.`})})]})]})}function f(o={}){const{wrapper:r}={...d(),...o.components};return r?e.jsx(r,{...o,children:e.jsx(l,{...o})}):l(o)}function t(o,r){throw new Error("Expected component `"+o+"` to be defined: you likely forgot to import, pass, or provide it.")}export{f as default,p as meta};

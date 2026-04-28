@@ -1,0 +1,150 @@
+.root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #050507;
+  /* Mobile-first: stack canvas on top, controls below. */
+  display: flex;
+  flex-direction: column;
+}
+
+.canvasHost {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  position: relative;
+}
+
+/* Override the inline width/height that R3F sets on its <canvas>; we want
+   the canvas to fill the flex slot, not match the demo cell's full size. */
+.canvasHost > canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.panel {
+  /* Mobile-first: a non-overlapping bottom strip so the canvas above
+     gets the full width. Two columns fit five controls in ~160px tall. */
+  flex: 0 0 auto;
+  width: 100%;
+  padding: 0.6rem 0.75rem 0.85rem;
+  background: rgba(8, 6, 24, 0.92);
+  border-top: 1px solid rgba(167, 139, 250, 0.22);
+  font-family: var(--font-mono);
+  color: var(--color-text);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.55rem 0.85rem;
+  pointer-events: auto;
+  align-content: start;
+}
+
+.panelTitle {
+  grid-column: 1 / -1;
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #d6c8ff;
+  margin: 0;
+}
+
+.shapeRow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.shapeLabel {
+  font-size: 0.65rem;
+  color: #ece4ff;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.select {
+  min-height: 40px;
+  padding: 0 0.5rem;
+  border-radius: 0.4rem;
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  background: rgba(0, 0, 0, 0.45);
+  color: #ece4ff;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  cursor: pointer;
+  width: 100%;
+}
+
+.select:focus-visible {
+  outline: 2px solid var(--color-focus-ring, #a78bfa);
+  outline-offset: 2px;
+}
+
+.checkRow {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 44px;
+}
+
+.check {
+  width: 20px;
+  height: 20px;
+  accent-color: #a78bfa;
+  cursor: pointer;
+}
+
+.checkLabel {
+  font-size: 0.72rem;
+  color: #ece4ff;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+/* Tablet+: switch back to the floating glass overlay so the canvas fills
+   the entire panel and the controls hover in the bottom-right corner. */
+@media (min-width: 768px) {
+  .root {
+    display: block;
+  }
+
+  .canvasHost {
+    width: 100%;
+    height: 100%;
+  }
+
+  .canvasHost > canvas {
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  .panel {
+    position: absolute;
+    right: 1rem;
+    bottom: 1rem;
+    top: auto;
+    width: min(280px, 38%);
+    border: 1px solid rgba(167, 139, 250, 0.22);
+    border-radius: 0.75rem;
+    padding: 0.85rem 0.95rem;
+    background: rgba(8, 6, 24, 0.82);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  .panelTitle {
+    font-size: 0.7rem;
+  }
+
+  .checkRow {
+    min-height: 36px;
+  }
+}

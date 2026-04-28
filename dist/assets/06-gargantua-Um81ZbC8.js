@@ -1,0 +1,6 @@
+import{u as d,j as e}from"./index-CFoTI59D.js";const h={id:"v2-gargantua",title:"Gargantua"};function l(n){const t={p:"p",...d(),...n.components},{Body:r,Eyebrow:i,Overlay:o,Placeholder:c,Title:s}=t;return r||a("Body"),i||a("Eyebrow"),o||a("Overlay"),c||a("Placeholder"),s||a("Title"),e.jsxs(e.Fragment,{children:[e.jsx(c,{shape:"spiral",caption:"Demo: warped accretion disk (placeholder)"}),`
+`,e.jsxs(o,{position:"bottom-left",children:[e.jsx(i,{children:"Topic 3 · Gargantua"}),e.jsx(s,{children:"Physics as cinematic art"}),e.jsx(r,{children:e.jsx(t.p,{children:`The black hole in Interstellar was based on real physics — gravitational\r
+lensing, light bending around the event horizon, a warped accretion disk.\r
+Equations became cinema.`})}),e.jsx(r,{children:e.jsx(t.p,{children:`You probably can't write a physically accurate renderer from scratch. But\r
+AI can help you understand the approximation, and you can build a\r
+simplified shader that still feels cinematic.`})})]})]})}function u(n={}){const{wrapper:t}={...d(),...n.components};return t?e.jsx(t,{...n,children:e.jsx(l,{...n})}):l(n)}function a(n,t){throw new Error("Expected component `"+n+"` to be defined: you likely forgot to import, pass, or provide it.")}export{u as default,h as meta};
