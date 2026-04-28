@@ -113,7 +113,7 @@ export const projectRegistry: RegistryEntry[] = [
       title: 'Prismata',
       year: 2026,
       renderer: 'three',
-      description: 'Recursive iridescent spire built from shared line, polygon, and solid primitives — synced to audio.',
+      description: 'Recursive cloud of orbiting iridescent crystals with per-node variation in count, kind, and size — synced to audio.',
       tags: ['three', 'shader', 'audio', 'fractal', 'iridescent'],
     },
     load: () => import('./prismata'),

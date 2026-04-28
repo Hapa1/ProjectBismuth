@@ -7,13 +7,12 @@ import type { ProjectComponentProps } from '../../types/project';
 import styles from './Prismata.module.css';
 import { useAudioAnalyser, type AudioBands } from '../../lib/useAudioAnalyser';
 import {
-  IridescentLine,
-  IridescentPolygon,
   IridescentSolid,
   useIridescentMaterial,
   useAudioUniforms,
   usePrefersReducedMotion,
   type IridescentPaletteMode,
+  type IridescentSolidKind,
 } from '../../lib/iridescent';
 
 // ---------------------------------------------------------------------------
@@ -23,33 +22,54 @@ interface Controls {
   audioGain: number;
   smoothing: number;
   reactivity: number;
-  branchCount: number;
+  avgOrbitCount: number;
   ringRadius: number;
   childScale: number;
   spinBase: number;
   bloomIntensity: number;
   palette: IridescentPaletteMode;
+  seed: number;
 }
 
 const DEFAULTS: Controls = {
   audioGain: 0.95,
   smoothing: 0.82,
-  reactivity: 0.85,
-  branchCount: 5,
-  ringRadius: 1.55,
-  childScale: 0.46,
+  reactivity: 0.45,
+  avgOrbitCount: 5,
+  ringRadius: 1.7,
+  childScale: 0.5,
   spinBase: 0.28,
-  bloomIntensity: 0.7,
+  bloomIntensity: 0.45,
   palette: 'cosine',
+  seed: 137,
 };
 
 // ---------------------------------------------------------------------------
-// FractalNode — recursive iridescent spire
+// Deterministic per-node variation
+// ---------------------------------------------------------------------------
+// xmur3 + splitmix-flavored hash so a single integer seed yields stable
+// pseudo-random per-node values across renders.
+function hash01(seed: number): number {
+  let h = Math.imul(seed ^ 0x9e3779b9, 0x85ebca6b);
+  h ^= h >>> 13;
+  h = Math.imul(h, 0xc2b2ae35);
+  h ^= h >>> 16;
+  return (h >>> 0) / 0x100000000;
+}
+function hashInt(seed: number, loInclusive: number, hiInclusive: number): number {
+  return loInclusive + Math.floor(hash01(seed) * (hiInclusive - loInclusive + 1));
+}
+
+const KINDS: IridescentSolidKind[] = ['tetra', 'box', 'octa', 'icosa', 'prism'];
+
+// ---------------------------------------------------------------------------
+// FractalNode — orbiting iridescent crystals
 // ---------------------------------------------------------------------------
 interface NodeProps {
   level: number;
   maxDepth: number;
-  branchCount: number;
+  /** Mean orbit count at this level; per-node varies ±1. */
+  avgOrbitCount: number;
   ringRadius: number;
   childScale: number;
   spinBase: number;
@@ -57,14 +77,15 @@ interface NodeProps {
   bandsRef: React.MutableRefObject<AudioBands>;
   reactivity: number;
   reduceMotion: boolean;
-  /** Reverses spin sign every other level for visual contrast. */
   spinSign: number;
+  /** Seed used to derive deterministic per-node variation. */
+  seed: number;
 }
 
 function FractalNode({
   level,
   maxDepth,
-  branchCount,
+  avgOrbitCount,
   ringRadius,
   childScale,
   spinBase,
@@ -73,6 +94,7 @@ function FractalNode({
   reactivity,
   reduceMotion,
   spinSign,
+  seed,
 }: NodeProps) {
   const groupRef = useRef<THREE.Group>(null);
 
@@ -85,71 +107,87 @@ function FractalNode({
     groupRef.current.rotation.x += dt * speed * 0.35 * spinSign;
   });
 
-  // Generate ring positions in the XZ plane (computed even at leaves so the
-  // hook order stays stable; unused at leaves).
-  const ringPoints = useMemo(() => {
-    const pts: Array<[number, number, number]> = [];
-    for (let i = 0; i < branchCount; i += 1) {
-      const a = (i / branchCount) * Math.PI * 2;
-      pts.push([Math.cos(a) * ringRadius, 0, Math.sin(a) * ringRadius]);
-    }
-    return pts;
-  }, [branchCount, ringRadius]);
+  // Per-node variation derived from the seed. Memoised so the structure is
+  // stable across re-renders unless seed/avgOrbitCount changes.
+  const variation = useMemo(() => {
+    const centerKind = KINDS[hashInt(seed * 7 + 1, 0, KINDS.length - 1)];
+    const centerSize = 0.45 + hash01(seed * 11 + 3) * 0.4;
+    // Orbit count varies ±1 from the requested average (clamped >= 2).
+    const orbitCount = Math.max(2, avgOrbitCount + hashInt(seed * 13 + 5, -1, 1));
+    // A common tilt for this node's orbit so children read as a ring rather
+    // than a chaotic cloud.
+    const tilt = (hash01(seed * 17 + 7) - 0.5) * 0.9;
+    const yaw = hash01(seed * 19 + 11) * Math.PI * 2;
 
-  // Leaf — just a small solid.
+    const children = Array.from({ length: orbitCount }, (_, i) => {
+      const cs = seed * 31 + i * 53 + 101;
+      return {
+        seed: cs,
+        kind: KINDS[hashInt(cs * 23, 0, KINDS.length - 1)],
+        size: 0.45 + hash01(cs * 29) * 0.7, // 0.45–1.15
+        angleJitter: (hash01(cs * 37) - 0.5) * 0.5,
+        radialJitter: 0.85 + hash01(cs * 41) * 0.3, // 0.85–1.15
+        spinPhase: hash01(cs * 43) * Math.PI * 2,
+      };
+    });
+
+    return { centerKind, centerSize, orbitCount, tilt, yaw, children };
+  }, [seed, avgOrbitCount]);
+
+  // Leaf — single crystal, no children.
   if (level >= maxDepth) {
     return (
       <IridescentSolid
-        kind={level % 2 === 0 ? 'tetra' : 'octa'}
-        size={0.55}
+        kind={variation.centerKind}
+        size={variation.centerSize * 0.9}
         material={material}
+        rotation={[variation.yaw, variation.tilt, 0]}
       />
     );
   }
 
   return (
     <group ref={groupRef}>
-      {/* Central solid */}
+      {/* Central crystal */}
       <IridescentSolid
-        kind={level === 0 ? 'icosa' : level % 2 === 0 ? 'tetra' : 'octa'}
-        size={0.62}
+        kind={variation.centerKind}
+        size={variation.centerSize}
         material={material}
+        rotation={[variation.tilt * 0.5, variation.yaw, 0]}
       />
 
-      {/* Encircling polygon outline (lies in XZ plane) */}
-      <IridescentPolygon
-        sides={Math.max(3, branchCount + 1)}
-        radius={ringRadius * 0.72}
-        outlineWidth={0.022}
-        rotation={[Math.PI / 2, 0, 0]}
-        material={material}
-      />
-
-      {/* Branch lines + child nodes */}
-      {ringPoints.map((p, i) => (
-        <group key={i}>
-          <IridescentLine
-            points={[[0, 0, 0], p]}
-            width={0.018}
-            material={material}
-          />
-          <group position={p} scale={childScale}>
-            <FractalNode
-              level={level + 1}
-              maxDepth={maxDepth}
-              branchCount={Math.max(3, branchCount - 1)}
-              ringRadius={ringRadius * 0.95}
-              childScale={childScale}
-              spinBase={spinBase * 1.1}
-              material={material}
-              bandsRef={bandsRef}
-              reactivity={reactivity}
-              reduceMotion={reduceMotion}
-              spinSign={-spinSign}
-            />
-          </group>
-        </group>
-      ))}
+      {/* Orbiting children — laid out on a tilted ring with per-child variation. */}
+      <group rotation={[variation.tilt, variation.yaw, 0]}>
+        {variation.children.map((c, i) => {
+          const a = (i / variation.children.length) * Math.PI * 2 + c.angleJitter;
+          const r = ringRadius * c.radialJitter;
+          const px = Math.cos(a) * r;
+          const pz = Math.sin(a) * r;
+          return (
+            <group
+              key={i}
+              position={[px, 0, pz]}
+              scale={childScale * c.size}
+              rotation={[0, c.spinPhase, 0]}
+            >
+              <FractalNode
+                level={level + 1}
+                maxDepth={maxDepth}
+                avgOrbitCount={Math.max(2, avgOrbitCount - 1)}
+                ringRadius={ringRadius * 0.95}
+                childScale={childScale}
+                spinBase={spinBase * 1.15}
+                material={material}
+                bandsRef={bandsRef}
+                reactivity={reactivity}
+                reduceMotion={reduceMotion}
+                spinSign={-spinSign}
+                seed={c.seed}
+              />
+            </group>
+          );
+        })}
+      </group>
     </group>
   );
 }
@@ -167,35 +205,40 @@ interface SceneProps {
 function Scene({ bandsRef, controls, reduceMotion, maxDepth }: SceneProps) {
   const material = useIridescentMaterial({
     palette: controls.palette,
-    intensity: 1.1,
+    intensity: 0.85,
     fresnelPower: 2.6,
-    rimBoost: 1.7,
-    innerWash: 0.35,
+    rimBoost: 1.4,
+    innerWash: 0.28,
     alphaBase: 0.04,
   });
 
   // Audio drives uTime + uMirage + uLevel + uTreble on the shared material.
+  // Softened envelope params keep beats from spiking the brightness.
   useAudioUniforms(material, {
     bandsRef,
     reactivity: controls.reactivity,
     pause: reduceMotion,
     timeScale: 1.0,
+    mirageFloor: 0.55,
+    mirageCeiling: 0.95,
+    mirageBase: 0.6,
+    mirageGain: 0.9,
   });
 
   // Treble drives a global hue shift uniform written here so audio influences
   // colour even without a beat (uMirage handles transients separately).
   useFrame(() => {
     const b = bandsRef.current;
-    const target = b.treble * 0.35 * controls.reactivity;
+    const target = b.treble * 0.2 * controls.reactivity;
     const u = material.uniforms.uHueShift;
-    u.value += (target - u.value) * 0.05;
+    u.value += (target - u.value) * 0.04;
   });
 
   return (
     <FractalNode
       level={0}
       maxDepth={maxDepth}
-      branchCount={controls.branchCount}
+      avgOrbitCount={controls.avgOrbitCount}
       ringRadius={controls.ringRadius}
       childScale={controls.childScale}
       spinBase={controls.spinBase}
@@ -204,6 +247,7 @@ function Scene({ bandsRef, controls, reduceMotion, maxDepth }: SceneProps) {
       reactivity={controls.reactivity}
       reduceMotion={reduceMotion}
       spinSign={1}
+      seed={controls.seed}
     />
   );
 }
@@ -319,11 +363,11 @@ function Prismata({ width, height }: ProjectComponentProps) {
       </Canvas>
 
       <aside className={styles.panel} aria-label="Prismata controls">
-        <h3 className={styles.panelTitle}>Prismata · Audio Fractal</h3>
+        <h3 className={styles.panelTitle}>Prismata · Audio Crystals</h3>
         <p className={styles.subtitle}>
-          Recursive iridescent spire built from shared line, polygon, and solid
-          primitives. Bass beats drive the mirage envelope, mid energy sets
-          rotation speed, treble shifts the palette.
+          Recursive cloud of orbiting iridescent crystals — orbit count, kind,
+          and size vary per node. Bass beats drive the mirage envelope, mid
+          energy sets rotation speed, treble shifts the palette.
         </p>
 
         <section className={styles.section}>
@@ -439,18 +483,18 @@ function Prismata({ width, height }: ProjectComponentProps) {
         <section className={styles.section}>
           <p className={styles.sectionTitle}>Geometry</p>
           <Slider
-            label="Branches"
-            min={3}
+            label="Avg Orbits"
+            min={2}
             max={7}
             step={1}
-            value={controls.branchCount}
-            onChange={(v) => setControls((c) => ({ ...c, branchCount: v }))}
+            value={controls.avgOrbitCount}
+            onChange={(v) => setControls((c) => ({ ...c, avgOrbitCount: v }))}
             format={(v) => v.toFixed(0)}
           />
           <Slider
             label="Ring Radius"
             min={1.0}
-            max={2.4}
+            max={2.6}
             step={0.05}
             value={controls.ringRadius}
             onChange={(v) => setControls((c) => ({ ...c, ringRadius: v }))}
@@ -458,7 +502,7 @@ function Prismata({ width, height }: ProjectComponentProps) {
           <Slider
             label="Child Scale"
             min={0.3}
-            max={0.6}
+            max={0.65}
             step={0.01}
             value={controls.childScale}
             onChange={(v) => setControls((c) => ({ ...c, childScale: v }))}
@@ -479,6 +523,15 @@ function Prismata({ width, height }: ProjectComponentProps) {
             value={controls.bloomIntensity}
             onChange={(v) => setControls((c) => ({ ...c, bloomIntensity: v }))}
           />
+          <button
+            type="button"
+            className={styles.button}
+            onClick={() =>
+              setControls((c) => ({ ...c, seed: Math.floor(Math.random() * 9999) }))
+            }
+          >
+            Reshuffle
+          </button>
         </section>
       </aside>
     </div>

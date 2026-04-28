@@ -452,8 +452,19 @@ function drawExpanse(p: P5, width: number, height: number, controls: Controls) {
   p.push();
   p.translate(width / 2, height / 2);
 
-  for (let yi = rows - 1; yi >= 0; yi -= 1) {
-    for (let xi = 0; xi < cols; xi += 1) {
+  // Hoist sun — it doesn't change per-tile.
+  const sun = getSunPosition(p, width, height, controls);
+
+  // Correct isometric painter's algorithm: iterate diagonals (xi+yi) from
+  // furthest to nearest. Within each diagonal draw xi high→low so that a
+  // tile's left face is always painted before the neighbouring tile whose
+  // top sits at that same boundary.
+  const maxD = cols + rows - 2;
+  for (let d = maxD; d >= 0; d -= 1) {
+    const xiStart = Math.min(cols - 1, d);
+    const xiEnd = Math.max(0, d - (rows - 1));
+    for (let xi = xiStart; xi >= xiEnd; xi -= 1) {
+      const yi = d - xi;
       const x = -totalDim / 2 + xi * cw;
       const y = -totalDim / 2 + yi * ch;
 
@@ -499,10 +510,10 @@ function drawExpanse(p: P5, width: number, height: number, controls: Controls) {
         shapeTop[1],
       ];
 
-      const sun = getSunPosition(p, width, height, controls);
-      drawShape(p, basis, shapeTop, sun, palette, paletteLevels, controls.gamma, controls.outline, 1.05);
+      // Side faces first so the top always paints over them.
       drawShape(p, basis, shapeLeft, sun, palette, paletteLevels, controls.gamma, controls.outline, 0.86);
       drawShape(p, basis, shapeRight, sun, palette, paletteLevels, controls.gamma, controls.outline, 0.7);
+      drawShape(p, basis, shapeTop, sun, palette, paletteLevels, controls.gamma, controls.outline, 1.05);
     }
   }
 
