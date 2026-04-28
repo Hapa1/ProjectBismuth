@@ -174,7 +174,7 @@ function SliderControl({ label, min, max, step, value, onChange, format }: Slide
   );
 }
 
-function Sierpinski3D({ width, height }: ProjectComponentProps) {
+function Sierpinski3D({ }: ProjectComponentProps) {
   const [controls, setControls] = useState<Controls>(DEFAULTS);
 
   const setDepth = useCallback((depth: number) => {
