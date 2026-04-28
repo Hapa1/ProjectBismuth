@@ -49,17 +49,15 @@ varying vec2 vUv;
 // Hash + noise helpers
 // ============================================================
 float hash12(vec2 p) {
-  // Sine-based hash — softer, less directional banding than fract-mul
-  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
-  p3 += dot(p3, p3.yzx + 33.33);
-  return fract((p3.x + p3.y) * p3.z);
+  p = fract(p * vec2(234.34, 435.345));
+  p += dot(p, p + 34.23);
+  return fract(p.x * p.y);
 }
 
 float vnoise(vec2 p) {
   vec2 i = floor(p);
   vec2 f = fract(p);
-  // Quintic smoothstep — C2 continuous, removes the visible bilinear creases
-  f = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+  f = f * f * (3.0 - 2.0 * f);
   float a = hash12(i);
   float b = hash12(i + vec2(1.0, 0.0));
   float c = hash12(i + vec2(0.0, 1.0));
@@ -70,11 +68,10 @@ float vnoise(vec2 p) {
 float fbm(vec2 p) {
   float v = 0.0;
   float a = 0.5;
-  // Slight non-uniform rotation between octaves removes axis-aligned grid artifacts
-  mat2 r = mat2(0.80, 0.60, -0.60, 0.80);
-  for (int i = 0; i < 6; i++) {
+  mat2 r = mat2(0.8, 0.6, -0.6, 0.8);
+  for (int i = 0; i < 5; i++) {
     v += a * vnoise(p);
-    p = r * p * 2.07 + vec2(1.7, 9.2);
+    p = r * p * 2.0 + vec2(1.7, 9.2);
     a *= 0.5;
   }
   return v;
@@ -144,31 +141,10 @@ vec4 sampleDisk(vec3 hitPoint, vec3 rayDir) {
   float angle    = atan(hitPoint.z, hitPoint.x);
   float rNorm    = clamp((r - uDiskInner) / max(uDiskOuter - uDiskInner, 0.001), 0.0, 1.0);
 
-  // ---- Procedural disk turbulence ----
-  // Differential rotation: inner edge spins faster than the outer (Keplerian flavour).
-  float keplerian = uDiskSpin * (1.0 + 1.4 / max(r, 0.4));
-  float a         = angle + uTime * keplerian;
-
-  // Anisotropic UV: many cells around the ring, fewer across its width — mimics
-  // gas being sheared into long thin streamers by orbital velocity. Logarithmic
-  // radial coord prevents cells from stretching as r grows.
-  float logR    = log(max(r, 0.5));
-  vec2  baseUV  = vec2(a * 14.0, logR * 9.0 - uTime * 0.6);
-
-  // Two slightly offset samples form a free supersample, softening cell seams.
-  float n1 = fbm(baseUV);
-  float n2 = fbm(baseUV + vec2(0.07, -0.05));
-  float swirl = fbm(vec2(a * 24.0 + n1 * 2.5, logR * 18.0));
-  float density = mix(0.5 * (n1 + n2), swirl, 0.45);
-
-  // Thin tangential streamers — the "filament" look of a hot disk
-  float streamers = 0.5 + 0.5 * sin(
-    a * 32.0
-    + logR * 6.0
-    + n1 * 6.0
-    + uTime * 0.8
-  );
-  streamers = pow(streamers, 3.0);
+  // Polar noise: spirals inward as time advances
+  float a       = angle + uTime * uDiskSpin;
+  vec2  noiseUV = vec2(a * 5.0, r * 3.0 - uTime * 0.4);
+  float density = mix(fbm(noiseUV), fbm(noiseUV * 2.3 + 5.0), 0.4);
 
   // Heat: hottest at the inner edge
   float heat = pow(1.0 - rNorm, mix(1.8, 0.9, uDiskTemp));
@@ -176,8 +152,7 @@ vec4 sampleDisk(vec3 hitPoint, vec3 rayDir) {
 
   // Brightness profile
   float bri  = pow(1.0 - rNorm, 1.4) * 2.2;
-  bri       += pow(density,   3.5) * uTurbulence * 1.6;
-  bri       += streamers * uTurbulence * 0.55 * (1.0 - rNorm * 0.4);
+  bri       += pow(density, 3.5) * uTurbulence * 1.6;
 
   // Doppler: relativistic beaming on the side of the disk moving toward us
   vec3  orbit   = normalize(vec3(-hitPoint.z, 0.0, hitPoint.x));

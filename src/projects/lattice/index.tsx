@@ -57,10 +57,10 @@ const DEFAULTS: Controls = {
   smoothing: 0.82,
   reactivity: 1.1,
   beatThreshold: 1.12,
-  pulseRadius: 1.9,
+  pulseRadius: 3.2,
   pulseDecay: 1.4,
   pointerRadius: 2.6,
-  bloomIntensity: 0.75,
+  bloomIntensity: 1.25,
   pulseMode: 'ripple',
   pulseSpeed: 8.0,
 };
@@ -114,13 +114,7 @@ function gridDimsFor(width: number, height: number): GridDims {
 // PointerTracker
 // ---------------------------------------------------------------------------
 
-function PointerTracker({
-  sharedRef,
-  controlsRef,
-}: {
-  sharedRef: SharedRef;
-  controlsRef: React.MutableRefObject<Controls>;
-}) {
+function PointerTracker({ sharedRef }: { sharedRef: SharedRef }) {
   const { camera, gl } = useThree();
   const ndc = useRef(new THREE.Vector2(0, 0));
   const raycastPlane = useMemo(
@@ -129,7 +123,6 @@ function PointerTracker({
   );
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const tmpVec3 = useMemo(() => new THREE.Vector3(), []);
-  const clickHueSeed = useRef(Math.random());
 
   useEffect(() => {
     const el = gl.domElement;
@@ -144,56 +137,15 @@ function PointerTracker({
     const onLeave = () => {
       sharedRef.current.pointer.targetStrength = 0;
     };
-    const onDown = (e: PointerEvent) => {
-      // Update NDC for the click point so the pulse spawns where the user
-      // actually clicked (pointermove may not have fired on touch).
-      const rect = el.getBoundingClientRect();
-      ndc.current.set(
-        ((e.clientX - rect.left) / rect.width) * 2 - 1,
-        -(((e.clientY - rect.top) / rect.height) * 2 - 1),
-      );
-      // Resolve world coordinates immediately.
-      raycaster.setFromCamera(ndc.current, camera);
-      if (!raycaster.ray.intersectPlane(raycastPlane, tmpVec3)) return;
-
-      const pulses = sharedRef.current.pulses;
-      if (pulses.length >= MAX_PULSES) pulses.shift();
-
-      const ripple = controlsRef.current.pulseMode === 'ripple';
-      const dirs: [number, number, number, number] = [0, 0, 0, 0];
-      if (ripple) {
-        const dirCount = 1 + Math.floor(Math.random() * 4);
-        const order = [0, 1, 2, 3];
-        for (let i = order.length - 1; i > 0; i -= 1) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [order[i], order[j]] = [order[j], order[i]];
-        }
-        for (let i = 0; i < dirCount; i += 1) dirs[order[i]] = 1;
-      } else {
-        dirs[0] = dirs[1] = dirs[2] = dirs[3] = 1;
-      }
-
-      clickHueSeed.current = (clickHueSeed.current + 0.37) % 1;
-
-      pulses.push({
-        pos: new THREE.Vector2(tmpVec3.x, tmpVec3.y),
-        intensity: ripple ? 2.4 : 1.6,
-        hue: clickHueSeed.current,
-        age: 0,
-        dirs,
-      });
-    };
     el.addEventListener('pointermove', onMove);
     el.addEventListener('pointerleave', onLeave);
     el.addEventListener('pointercancel', onLeave);
-    el.addEventListener('pointerdown', onDown);
     return () => {
       el.removeEventListener('pointermove', onMove);
       el.removeEventListener('pointerleave', onLeave);
       el.removeEventListener('pointercancel', onLeave);
-      el.removeEventListener('pointerdown', onDown);
     };
-  }, [gl, sharedRef, controlsRef, camera, raycastPlane, raycaster, tmpVec3]);
+  }, [gl, sharedRef]);
 
   useFrame((_, delta) => {
     raycaster.setFromCamera(ndc.current, camera);
@@ -567,10 +519,6 @@ function Lattice({ width, height }: ProjectComponentProps) {
   const audio = useAudioController();
   const meterRef = useRef<HTMLDivElement>(null);
   const pulseDecayRef = useRef(controls.pulseDecay);
-  const controlsRef = useRef(controls);
-  useEffect(() => {
-    controlsRef.current = controls;
-  }, [controls]);
 
   // Long lens for a flat front-on view.
   const fovDeg = 18;
@@ -631,7 +579,7 @@ function Lattice({ width, height }: ProjectComponentProps) {
         gl={{ antialias: true, powerPreference: 'high-performance' }}
         dpr={[1, Math.min(window.devicePixelRatio, 2)]}
       >
-        <PointerTracker sharedRef={sharedRef} controlsRef={controlsRef} />
+        <PointerTracker sharedRef={sharedRef} />
         <Seams
           dims={dims}
           reduceMotion={reduceMotion}

@@ -7,7 +7,6 @@ export type IridescentSolidKind =
   | 'tetra'
   | 'octa'
   | 'icosa'
-  | 'dodeca'
   | 'box'
   | 'cone'
   | 'prism';
@@ -40,8 +39,6 @@ function buildGeometry(kind: IridescentSolidKind, size: number, segments: number
       return new THREE.OctahedronGeometry(size);
     case 'icosa':
       return new THREE.IcosahedronGeometry(size);
-    case 'dodeca':
-      return new THREE.DodecahedronGeometry(size);
     case 'box':
       return new THREE.BoxGeometry(size, size, size);
     case 'cone': {

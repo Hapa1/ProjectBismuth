@@ -164,6 +164,17 @@ export const projectRegistry: RegistryEntry[] = [
   },
   {
     meta: {
+      id: 'iso-blocks',
+      title: 'Iso Blocks',
+      year: 2026,
+      renderer: 'p5',
+      description: 'Voxel WFC building isometric stone, dirt, crystal, and iridescent bismuth terrain.',
+      tags: ['p5', 'wfc', 'isometric', 'voxel', 'iridescent'],
+    },
+    load: () => import('./iso-blocks'),
+  },
+  {
+    meta: {
       id: 'geometry-beneath',
       title: 'Geometry Beneath Everything',
       year: 2026,

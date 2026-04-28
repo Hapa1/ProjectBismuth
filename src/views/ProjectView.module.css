@@ -41,6 +41,10 @@
 
 .breadcrumbLink {
   color: var(--color-accent);
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0.25rem;
 }
 
 .sep {
