@@ -22,10 +22,10 @@ export const projectRegistry: RegistryEntry[] = [
   {
     meta: {
       id: 'expanse',
-      title: 'Expanse (Animated)',
+      title: 'Expanse',
       year: 2026,
       renderer: 'p5',
-      description: 'Animated slanted cuboid fields with interactive lighting and noise controls.',
+      description: 'Slanted cuboid fields with interactive lighting and noise controls.',
       tags: ['p5', 'isometric', 'generative', 'animation'],
     },
     load: () => import('./expanse'),

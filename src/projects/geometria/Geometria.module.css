@@ -1,0 +1,88 @@
+.root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #050507;
+}
+
+.canvasHost {
+  width: 100%;
+  height: 100%;
+}
+
+.chipBar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.6rem 0.6rem max(0.6rem, env(safe-area-inset-bottom));
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  font-family: var(--font-mono);
+  background: linear-gradient(180deg, transparent, rgba(5, 5, 7, 0.65) 40%, rgba(5, 5, 7, 0.92));
+  pointer-events: auto;
+}
+
+.chipBar::-webkit-scrollbar { display: none; }
+
+.chip {
+  flex: 0 0 auto;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  border: 1px solid rgba(167, 139, 250, 0.28);
+  background: rgba(8, 6, 24, 0.55);
+  color: #ece4ff;
+  font-family: var(--font-mono);
+  font-size: clamp(0.72rem, 0.68rem + 0.25vw, 0.82rem);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  white-space: nowrap;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.chip:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .chip:hover {
+    background: rgba(167, 139, 250, 0.18);
+    border-color: rgba(167, 139, 250, 0.5);
+  }
+}
+
+.chipActive {
+  background: rgba(167, 139, 250, 0.32);
+  border-color: rgba(167, 139, 250, 0.7);
+  color: #fff;
+}
+
+.chipIndex {
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  letter-spacing: 0.12em;
+}
+
+.chipActive .chipIndex {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+@media (min-width: 768px) {
+  .chipBar {
+    justify-content: center;
+    padding: 0.9rem;
+    background: linear-gradient(180deg, transparent, rgba(5, 5, 7, 0.4) 60%, rgba(5, 5, 7, 0.85));
+  }
+}

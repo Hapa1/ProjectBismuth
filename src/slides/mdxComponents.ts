@@ -8,6 +8,7 @@ import { SlideCode } from '../components/slides/SlideCode';
 import { SlideCompare } from '../components/slides/SlideCompare';
 import { SymbolWall } from '../components/slides/SymbolWall';
 import { SymbolExhibits } from '../components/slides/exhibits/SymbolExhibits';
+import { ArtistCarousel } from '../components/slides/ArtistCarousel';
 
 /**
  * Components automatically available inside any slide MDX file. Authors can
@@ -20,6 +21,7 @@ export const slideMdxComponents: MDXComponents = {
   Placeholder: SlidePlaceholder,
   SymbolWall,
   SymbolExhibits,
+  ArtistCarousel,
   Overlay: SlideOverlay,
   Title: SlideTitle,
   Eyebrow: SlideEyebrow,

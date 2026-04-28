@@ -57,10 +57,10 @@ const DEFAULTS: Controls = {
   smoothing: 0.82,
   reactivity: 1.1,
   beatThreshold: 1.12,
-  pulseRadius: 3.2,
+  pulseRadius: 1.9,
   pulseDecay: 1.4,
   pointerRadius: 2.6,
-  bloomIntensity: 1.25,
+  bloomIntensity: 0.75,
   pulseMode: 'ripple',
   pulseSpeed: 8.0,
 };
@@ -74,6 +74,8 @@ interface Pulse {
   intensity: number;
   hue: number;
   age: number;
+  // [+x, -x, +y, -y] mask (0 or 1).
+  dirs: [number, number, number, number];
 }
 
 interface PointerState {
@@ -112,7 +114,13 @@ function gridDimsFor(width: number, height: number): GridDims {
 // PointerTracker
 // ---------------------------------------------------------------------------
 
-function PointerTracker({ sharedRef }: { sharedRef: SharedRef }) {
+function PointerTracker({
+  sharedRef,
+  controlsRef,
+}: {
+  sharedRef: SharedRef;
+  controlsRef: React.MutableRefObject<Controls>;
+}) {
   const { camera, gl } = useThree();
   const ndc = useRef(new THREE.Vector2(0, 0));
   const raycastPlane = useMemo(
@@ -121,6 +129,7 @@ function PointerTracker({ sharedRef }: { sharedRef: SharedRef }) {
   );
   const raycaster = useMemo(() => new THREE.Raycaster(), []);
   const tmpVec3 = useMemo(() => new THREE.Vector3(), []);
+  const clickHueSeed = useRef(Math.random());
 
   useEffect(() => {
     const el = gl.domElement;
@@ -135,15 +144,56 @@ function PointerTracker({ sharedRef }: { sharedRef: SharedRef }) {
     const onLeave = () => {
       sharedRef.current.pointer.targetStrength = 0;
     };
+    const onDown = (e: PointerEvent) => {
+      // Update NDC for the click point so the pulse spawns where the user
+      // actually clicked (pointermove may not have fired on touch).
+      const rect = el.getBoundingClientRect();
+      ndc.current.set(
+        ((e.clientX - rect.left) / rect.width) * 2 - 1,
+        -(((e.clientY - rect.top) / rect.height) * 2 - 1),
+      );
+      // Resolve world coordinates immediately.
+      raycaster.setFromCamera(ndc.current, camera);
+      if (!raycaster.ray.intersectPlane(raycastPlane, tmpVec3)) return;
+
+      const pulses = sharedRef.current.pulses;
+      if (pulses.length >= MAX_PULSES) pulses.shift();
+
+      const ripple = controlsRef.current.pulseMode === 'ripple';
+      const dirs: [number, number, number, number] = [0, 0, 0, 0];
+      if (ripple) {
+        const dirCount = 1 + Math.floor(Math.random() * 4);
+        const order = [0, 1, 2, 3];
+        for (let i = order.length - 1; i > 0; i -= 1) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [order[i], order[j]] = [order[j], order[i]];
+        }
+        for (let i = 0; i < dirCount; i += 1) dirs[order[i]] = 1;
+      } else {
+        dirs[0] = dirs[1] = dirs[2] = dirs[3] = 1;
+      }
+
+      clickHueSeed.current = (clickHueSeed.current + 0.37) % 1;
+
+      pulses.push({
+        pos: new THREE.Vector2(tmpVec3.x, tmpVec3.y),
+        intensity: ripple ? 2.4 : 1.6,
+        hue: clickHueSeed.current,
+        age: 0,
+        dirs,
+      });
+    };
     el.addEventListener('pointermove', onMove);
     el.addEventListener('pointerleave', onLeave);
     el.addEventListener('pointercancel', onLeave);
+    el.addEventListener('pointerdown', onDown);
     return () => {
       el.removeEventListener('pointermove', onMove);
       el.removeEventListener('pointerleave', onLeave);
       el.removeEventListener('pointercancel', onLeave);
+      el.removeEventListener('pointerdown', onDown);
     };
-  }, [gl, sharedRef]);
+  }, [gl, sharedRef, controlsRef, camera, raycastPlane, raycaster, tmpVec3]);
 
   useFrame((_, delta) => {
     raycaster.setFromCamera(ndc.current, camera);
@@ -184,6 +234,9 @@ function Seams({ dims, reduceMotion, sharedRef, controls, pulseDecayRef }: Seams
     const pulseI = new Float32Array(MAX_PULSES);
     const pulseHue = new Float32Array(MAX_PULSES);
     const pulseAge = new Float32Array(MAX_PULSES);
+    const pulseDirs = new Array(MAX_PULSES)
+      .fill(0)
+      .map(() => new THREE.Vector4(1, 1, 1, 1));
     return new THREE.ShaderMaterial({
       vertexShader: seamVert,
       fragmentShader: seamFrag,
@@ -198,6 +251,7 @@ function Seams({ dims, reduceMotion, sharedRef, controls, pulseDecayRef }: Seams
         uPulseI: { value: pulseI },
         uPulseHue: { value: pulseHue },
         uPulseAge: { value: pulseAge },
+        uPulseDirs: { value: pulseDirs },
         uPulseRadius: { value: controls.pulseRadius },
         uPulseMode: { value: controls.pulseMode === 'ripple' ? 1 : 0 },
         uPulseSpeed: { value: controls.pulseSpeed },
@@ -308,10 +362,12 @@ function Seams({ dims, reduceMotion, sharedRef, controls, pulseDecayRef }: Seams
     const hIArr = hMaterial.uniforms.uPulseI.value as Float32Array;
     const hHueArr = hMaterial.uniforms.uPulseHue.value as Float32Array;
     const hAgeArr = hMaterial.uniforms.uPulseAge.value as Float32Array;
+    const hDirArr = hMaterial.uniforms.uPulseDirs.value as THREE.Vector4[];
     const vPosArr = vMaterial.uniforms.uPulsePos.value as THREE.Vector2[];
     const vIArr = vMaterial.uniforms.uPulseI.value as Float32Array;
     const vHueArr = vMaterial.uniforms.uPulseHue.value as Float32Array;
     const vAgeArr = vMaterial.uniforms.uPulseAge.value as Float32Array;
+    const vDirArr = vMaterial.uniforms.uPulseDirs.value as THREE.Vector4[];
     for (let i = 0; i < count; i += 1) {
       const p = pulses[i];
       hPosArr[i].copy(p.pos);
@@ -322,6 +378,8 @@ function Seams({ dims, reduceMotion, sharedRef, controls, pulseDecayRef }: Seams
       vHueArr[i] = p.hue;
       hAgeArr[i] = p.age;
       vAgeArr[i] = p.age;
+      hDirArr[i].set(p.dirs[0], p.dirs[1], p.dirs[2], p.dirs[3]);
+      vDirArr[i].set(p.dirs[0], p.dirs[1], p.dirs[2], p.dirs[3]);
     }
     hMaterial.uniforms.uPulseCount.value = count;
     vMaterial.uniforms.uPulseCount.value = count;
@@ -362,6 +420,9 @@ function BeatDriver({ bandsRef, sharedRef, dims, controls }: BeatDriverProps) {
   const lastBeat = useRef(999);
   const sinceAnyPulse = useRef(0);
   const hueSeed = useRef(Math.random());
+  // Smooth-noise phase advanced per-spawn — gives perlin-ish drifting
+  // positions instead of pure white-noise scatter.
+  const noiseT = useRef(Math.random() * 100);
 
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.1);
@@ -403,22 +464,58 @@ function BeatDriver({ bandsRef, sharedRef, dims, controls }: BeatDriverProps) {
       const pulses = sharedRef.current.pulses;
       if (pulses.length >= MAX_PULSES) pulses.shift();
 
-      // Ripple mode emanates from the center; glow mode scatters randomly.
       const ripple = controls.pulseMode === 'ripple';
-      const x = ripple ? 0 : (Math.random() * 2 - 1) * dims.worldHalfW * 0.85;
-      const y = ripple ? 0 : (Math.random() * 2 - 1) * dims.worldHalfH * 0.85;
+
+      // Spawn position: ripple uses smooth perlin-ish noise (drifting around
+      // the lattice); glow keeps the original random scatter.
+      let x: number;
+      let y: number;
+      if (ripple) {
+        const t = noiseT.current;
+        const nx = Math.sin(t * 0.71 + 1.3) * 0.6 + Math.sin(t * 1.73 + 4.1) * 0.4;
+        const ny = Math.sin(t * 0.93 + 2.7) * 0.6 + Math.sin(t * 1.31 + 0.5) * 0.4;
+        x = nx * dims.worldHalfW * 0.7;
+        y = ny * dims.worldHalfH * 0.7;
+        noiseT.current += 0.31 + Math.random() * 0.5;
+      } else {
+        x = (Math.random() * 2 - 1) * dims.worldHalfW * 0.85;
+        y = (Math.random() * 2 - 1) * dims.worldHalfH * 0.85;
+      }
 
       const energy = transient
         ? Math.max(b.bass, fastEnv.current - slowEnv.current)
         : b.level * 0.7;
-      const intensity = Math.min(2.2, 0.5 + energy * 1.8);
+
+      // Baseline: ripple matches pointer brightness (~1.0); beats magnify.
+      const baseline = ripple ? 1.0 : 0.5;
+      const beatBoost = transient ? 1.0 + Math.min(2.0, energy * 1.6) : 1.0;
+      const intensity = Math.min(3.5, (baseline + energy * 1.8) * beatBoost);
+
       hueSeed.current = (hueSeed.current + 0.31 + b.treble * 0.25) % 1;
+
+      // Pick 1–4 cardinal directions for the ripple to travel along; glow
+      // mode ignores direction (the shader uses the omnidirectional branch).
+      const dirs: [number, number, number, number] = [0, 0, 0, 0];
+      if (ripple) {
+        const dirCount = 1 + Math.floor(Math.random() * 4); // 1..4
+        const order = [0, 1, 2, 3];
+        for (let i = order.length - 1; i > 0; i -= 1) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [order[i], order[j]] = [order[j], order[i]];
+        }
+        for (let i = 0; i < dirCount; i += 1) {
+          dirs[order[i]] = 1;
+        }
+      } else {
+        dirs[0] = dirs[1] = dirs[2] = dirs[3] = 1;
+      }
 
       pulses.push({
         pos: new THREE.Vector2(x, y),
         intensity,
         hue: hueSeed.current,
         age: 0,
+        dirs,
       });
     }
   });
@@ -470,6 +567,10 @@ function Lattice({ width, height }: ProjectComponentProps) {
   const audio = useAudioController();
   const meterRef = useRef<HTMLDivElement>(null);
   const pulseDecayRef = useRef(controls.pulseDecay);
+  const controlsRef = useRef(controls);
+  useEffect(() => {
+    controlsRef.current = controls;
+  }, [controls]);
 
   // Long lens for a flat front-on view.
   const fovDeg = 18;
@@ -530,7 +631,7 @@ function Lattice({ width, height }: ProjectComponentProps) {
         gl={{ antialias: true, powerPreference: 'high-performance' }}
         dpr={[1, Math.min(window.devicePixelRatio, 2)]}
       >
-        <PointerTracker sharedRef={sharedRef} />
+        <PointerTracker sharedRef={sharedRef} controlsRef={controlsRef} />
         <Seams
           dims={dims}
           reduceMotion={reduceMotion}
