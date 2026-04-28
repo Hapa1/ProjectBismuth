@@ -32,39 +32,6 @@ export const projectRegistry: RegistryEntry[] = [
   },
   {
     meta: {
-      id: 'io',
-      title: 'Io',
-      year: 2026,
-      renderer: 'three',
-      description: 'Audio-reactive crystal field with rising plasma beams beneath a violet sky.',
-      tags: ['three', 'shader', 'audio', 'visualizer'],
-    },
-    load: () => import('./io'),
-  },
-  {
-    meta: {
-      id: 'luminal',
-      title: 'Luminal Pavilion',
-      year: 2026,
-      renderer: 'three',
-      description: 'Reflective pavilion with audio-reactive ring glows and a static forest view.',
-      tags: ['three', 'audio', 'shader', 'reflection'],
-    },
-    load: () => import('./luminal'),
-  },
-  {
-    meta: {
-      id: 'prism',
-      title: 'Prism',
-      year: 2026,
-      renderer: 'three',
-      description: 'Slowly spinning inverted pyramid with glossy iridescent fresnel shading.',
-      tags: ['three', 'shader', 'iridescent'],
-    },
-    load: () => import('./prism'),
-  },
-  {
-    meta: {
       id: 'lattice',
       title: 'Lattice',
       year: 2026,
