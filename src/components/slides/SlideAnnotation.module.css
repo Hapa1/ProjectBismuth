@@ -1,0 +1,132 @@
+/* ─── Positioning wrapper ────────────────────────────────────────────────────
+   Absolutely covers the slide so it never disturbs the flow of SlideOverlay
+   or other siblings, and always layers on top. pointer-events are disabled on
+   the wrapper so the underlying demo (OrbitControls, p5 canvas, etc.) keeps
+   receiving gestures outside the panel. */
+.wrap {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  padding: clamp(1rem, 3vw, 3rem);
+  pointer-events: none;
+}
+
+/* ─── Position variants ──────────────────────────────────────────────────── */
+.wrap[data-position='center'] {
+  align-items: center;
+  justify-content: center;
+}
+
+.wrap[data-position='top'] {
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.wrap[data-position='top-left'] {
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+.wrap[data-position='top-right'] {
+  align-items: flex-start;
+  justify-content: flex-end;
+}
+
+.wrap[data-position='bottom-left'] {
+  align-items: flex-end;
+  justify-content: flex-start;
+}
+
+.wrap[data-position='bottom-right'] {
+  align-items: flex-end;
+  justify-content: flex-end;
+}
+
+/* ─── Glass panel ────────────────────────────────────────────────────────── */
+.panel {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  max-width: min(460px, 90vw);
+  border-radius: 12px;
+  background: rgba(10, 10, 10, 0.68);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow:
+    0 0 0 1px rgba(167, 139, 250, 0.06),
+    0 20px 60px rgba(0, 0, 0, 0.65);
+  overflow: hidden;
+  animation: annotationIn 200ms ease both;
+}
+
+@keyframes annotationIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    animation: none;
+  }
+}
+
+/* ─── Toolbar row (dismiss button) ───────────────────────────────────────── */
+.toolbar {
+  display: flex;
+  justify-content: flex-end;
+  /* Minimal top padding so the × sits flush to the corner */
+  padding: 0.25rem 0.25rem 0;
+}
+
+/* ─── Dismiss button ─────────────────────────────────────────────────────── */
+.dismiss {
+  /* 44 × 44 touch target */
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: color 150ms ease, background 150ms ease;
+  flex-shrink: 0;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .dismiss:hover {
+    color: rgba(255, 255, 255, 0.85);
+    background: rgba(255, 255, 255, 0.07);
+  }
+}
+
+.dismiss:focus-visible {
+  outline: 2px solid var(--color-focus-ring, #a78bfa);
+  outline-offset: 2px;
+}
+
+/* ─── Content area ───────────────────────────────────────────────────────── */
+.content {
+  padding: 0 1.1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+@media (min-width: 768px) {
+  .content {
+    padding: 0 1.4rem 1.4rem;
+  }
+}
