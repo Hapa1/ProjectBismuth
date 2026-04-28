@@ -1,0 +1,33 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  flex: 1;
+  min-height: 60dvh;
+  text-align: center;
+  padding: 2rem;
+}
+
+.code {
+  font-size: clamp(3rem, 5vw, 6rem);
+  font-weight: 700;
+  color: var(--color-accent);
+  letter-spacing: -0.04em;
+}
+
+.message {
+  font-size: clamp(0.875rem, 0.8rem + 0.4vw, 1rem);
+  color: var(--color-text-muted);
+}
+
+.back {
+  font-size: 0.75rem;
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}

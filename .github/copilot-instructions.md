@@ -117,7 +117,7 @@ This portfolio must work on a 360px-wide phone before it works on a 4K monitor. 
 
 ## 7. Performance rules
 
-- Each project must build to its own chunk. **Shell ≤ 60 kB gz, any project chunk ≤ 250 kB gz.** Verify by inspecting `vite build` output if you change registry/import shape.
+- Each project must build to its own chunk. **Shell ≤ 120 kB gz, any project chunk ≤ 250 kB gz.** (React + Router + Framer Motion + Zustand alone account for ~86 kB gz, leaving ~34 kB gz for app code.) Verify by inspecting `vite build` output if you change registry/import shape.
 - Do not add heavy libraries to the shell. Renderer dependencies (three, p5, drei) belong inside project modules so they are lazy-loaded.
 - Avoid re-creating geometries/materials on every frame. Allocate in `useMemo` / `useEffect` and mutate uniforms in `useFrame`.
 - Share materials across recursively generated meshes when possible.

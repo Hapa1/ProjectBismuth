@@ -578,8 +578,10 @@ project-bismuth/
 
 | Chunk | Target (gzipped) |
 |---|---|
-| Shell (main + router + zustand + framer-motion) | ≤ 60 kB |
+| Shell (main + router + zustand + framer-motion + React) | ≤ 120 kB |
 | Any single project chunk (e.g. bismuth + three.js) | ≤ 250 kB |
+
+> **Note:** React 18 (~44 kB gz) + TanStack Router (~17 kB gz) + Framer Motion (~22 kB gz) + Zustand (~3 kB gz) account for ~86 kB gz of the shell budget by themselves. The 120 kB target leaves ~34 kB gz for app code. Project renderer deps (three.js, p5.js) must **never** appear in the shell chunk — they are lazy-loaded inside project modules only.
 
 Verify with `vite build && npx vite-bundle-visualizer`.
 
@@ -593,7 +595,7 @@ Verify with `vite build && npx vite-bundle-visualizer`.
 
 ### Performance
 - [ ] Each project ships as its own JS chunk (verify in `vite build` output).
-- [ ] Shell chunk ≤ 60 kB gzip; any project chunk ≤ 250 kB gzip.
+- [ ] Shell chunk ≤ 120 kB gzip; any project chunk ≤ 250 kB gzip.
 - [ ] No console warnings about disposed contexts, leaked listeners, or duplicate canvases when navigating rapidly between projects.
 
 ### Mobile & responsive

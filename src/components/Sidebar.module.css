@@ -1,0 +1,117 @@
+/* Mobile: sidebar is a fixed overlay, hidden by default */
+.sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: var(--sidebar-width);
+  height: 100dvh;
+  background: var(--color-surface);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem 1rem;
+  gap: 2rem;
+  z-index: 200;
+  transform: translateX(-100%);
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sidebar[data-open='true'] {
+  transform: translateX(0);
+}
+
+/* Desktop: always visible rail */
+@media (min-width: 1024px) {
+  .sidebar {
+    position: sticky;
+    top: 0;
+    transform: none;
+    transition: none;
+    flex-shrink: 0;
+  }
+}
+
+/* Backdrop (mobile only) */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 199;
+}
+
+@media (min-width: 1024px) {
+  .backdrop {
+    display: none;
+  }
+}
+
+/* Header / logo */
+.header {
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 1.25rem;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: clamp(0.875rem, 0.8rem + 0.4vw, 1rem);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-text);
+}
+
+.logoMark {
+  color: var(--color-accent);
+}
+
+/* Nav list */
+.navList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Nav item — min 44×44px touch target */
+.navItem {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.75rem;
+  border-radius: 6px;
+  min-height: 44px;
+  border: 1px solid transparent;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .navItem:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: var(--color-border);
+  }
+}
+
+.navItem[data-active='true'] {
+  background: rgba(167, 139, 250, 0.08);
+  border-color: rgba(167, 139, 250, 0.25);
+}
+
+.navTitle {
+  font-size: clamp(0.75rem, 0.7rem + 0.3vw, 0.875rem);
+  color: var(--color-text);
+}
+
+.navItem[data-active='true'] .navTitle {
+  color: var(--color-accent);
+}
+
+.navMeta {
+  font-size: 0.6875rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}

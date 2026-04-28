@@ -1,0 +1,48 @@
+.view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.menuBtn {
+  min-width: 44px;
+  min-height: 44px;
+  font-size: 1.25rem;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+@media (min-width: 1024px) {
+  .menuBtn {
+    display: none;
+  }
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  text-transform: lowercase;
+}
+
+.breadcrumbLink {
+  color: var(--color-accent);
+}
+
+.sep {
+  opacity: 0.4;
+}
