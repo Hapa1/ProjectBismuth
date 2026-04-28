@@ -10,6 +10,7 @@ import { SlideAnnotation } from '../components/slides/SlideAnnotation';
 import { SymbolWall } from '../components/slides/SymbolWall';
 import { SymbolExhibits } from '../components/slides/exhibits/SymbolExhibits';
 import { ArtistCarousel } from '../components/slides/ArtistCarousel';
+import { SlideReveal } from '../components/slides/SlideReveal';
 
 /**
  * Components automatically available inside any slide MDX file. Authors can
@@ -28,6 +29,7 @@ import { ArtistCarousel } from '../components/slides/ArtistCarousel';
  */
 export const slideMdxComponents: MDXComponents = {
   Demo: SlideDemo,
+  Reveal: SlideReveal,
   Placeholder: SlidePlaceholder,
   SymbolWall,
   SymbolExhibits,

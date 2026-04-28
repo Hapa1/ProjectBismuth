@@ -107,6 +107,31 @@
   color: var(--color-text);
 }
 
+.navItemRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.navSymbol {
+  width: 2.25rem;
+  height: 2.25rem;
+  flex-shrink: 0;
+  color: var(--color-accent);
+  opacity: 0.55;
+  transition: opacity 0.15s;
+}
+
+.navItem[data-active='true'] .navSymbol {
+  opacity: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .navItem:hover .navSymbol {
+    opacity: 0.85;
+  }
+}
+
 .navItem[data-active='true'] .navTitle {
   color: var(--color-accent);
 }

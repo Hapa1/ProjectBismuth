@@ -86,3 +86,116 @@
     background: linear-gradient(180deg, transparent, rgba(5, 5, 7, 0.4) 60%, rgba(5, 5, 7, 0.85));
   }
 }
+
+/* Slider panel */
+
+.sliderPanel {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.4rem;
+  z-index: 2;
+  pointer-events: auto;
+}
+
+.sliderToggle {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid rgba(167, 139, 250, 0.28);
+  background: rgba(8, 6, 24, 0.55);
+  color: #ece4ff;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.sliderToggle:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sliderToggle:hover {
+    background: rgba(167, 139, 250, 0.18);
+    border-color: rgba(167, 139, 250, 0.5);
+  }
+}
+
+.sliderTray {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.75rem 0.85rem;
+  border-radius: 12px;
+  border: 1px solid rgba(167, 139, 250, 0.22);
+  background: rgba(8, 6, 24, 0.7);
+  backdrop-filter: blur(12px);
+  min-width: 180px;
+}
+
+.sliderRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: clamp(0.68rem, 0.65rem + 0.2vw, 0.78rem);
+  color: #ece4ff;
+  cursor: pointer;
+}
+
+.sliderLabel {
+  flex: 0 0 3.2rem;
+  color: var(--color-text-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 0.62rem;
+}
+
+.sliderInput {
+  flex: 1;
+  min-width: 0;
+  height: 4px;
+  appearance: none;
+  background: rgba(167, 139, 250, 0.2);
+  border-radius: 2px;
+  outline: none;
+}
+
+.sliderInput::-webkit-slider-thumb {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #a78bfa;
+  cursor: pointer;
+  border: 2px solid rgba(5, 5, 7, 0.6);
+}
+
+.sliderInput::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #a78bfa;
+  cursor: pointer;
+  border: 2px solid rgba(5, 5, 7, 0.6);
+}
+
+.sliderInput:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.sliderValue {
+  flex: 0 0 2.4rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  font-size: 0.65rem;
+}

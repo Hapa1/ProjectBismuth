@@ -1,11 +1,12 @@
 # Slide 2 — Symbol Wall image credits
 
-All six photographs are sourced from Wikimedia Commons under Creative Commons
+All photographs are sourced from Wikimedia Commons under Creative Commons
 licenses. Each credit links to the source page and the license deed in the
 slide UI.
 
 | Symbol | File | Author | License | Source |
 | --- | --- | --- | --- | --- |
+| Geometria | `geometria.jpg` | Folger Shakespeare Library / Erhard Ratdolt | CC BY-SA 4.0 | https://commons.wikimedia.org/wiki/File:Euclid%27s_Elements,_1482.jpg |
 | Flower of Life | `flower-of-life.jpg` | Silar | CC BY-SA 4.0 | https://commons.wikimedia.org/wiki/File:020210830_004259_Hexafoil,_Silesian_Beskids.jpg |
 | Mandala | `mandala.jpg` | Colonel Warden | CC BY-SA 3.0 | https://commons.wikimedia.org/wiki/File:Chenrezig_Sand_Mandala.jpg |
 | Rose Window | `rose-window.jpg` | MOSSOT | CC BY-SA 3.0 | https://commons.wikimedia.org/wiki/File:Paris_Notre-Dame_Int%C3%A9rieur_164_rosac%C3%A9e_primitive.JPG |

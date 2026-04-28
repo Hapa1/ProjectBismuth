@@ -200,6 +200,10 @@ function BlackHoleQuad({ controls, width, height, reduceMotion }: QuadProps) {
 // Camera Rig — drives camera distance and OrbitControls
 // ============================================================
 
+// The shader also applies `diskTilt`, so the camera starts slightly higher than
+// a normal edge-on view to land at a cinematic angle after that transform.
+const CAMERA_INITIAL_Y = 4.5;
+
 interface CameraRigProps {
   cameraDistance: number;
   autoRotate: boolean;
@@ -208,6 +212,15 @@ interface CameraRigProps {
 function CameraRig({ cameraDistance, autoRotate }: CameraRigProps) {
   const { camera } = useThree();
   const target     = useRef(cameraDistance);
+
+  // Explicitly set the camera position on mount so it survives HMR and
+  // OrbitControls initialisation races.
+  useEffect(() => {
+    camera.position.set(0, CAMERA_INITIAL_Y, cameraDistance);
+    camera.lookAt(0, 0, 0);
+    camera.updateProjectionMatrix();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => { target.current = cameraDistance; }, [cameraDistance]);
 
@@ -323,8 +336,8 @@ export default function Gargantua({ width, height }: ProjectComponentProps) {
   const [controls, setControls] = useState<Controls>(initialControls);
   const reduceMotion = usePrefersReducedMotion();
 
-  // Cinematic initial camera position — near-equatorial for edge-on disk view
-  const initialPos: [number, number, number] = [0.0, 0.6, controls.cameraDistance];
+  // Cinematic initial camera position — slightly elevated for Interstellar-style disk view
+  const initialPos: [number, number, number] = [0.0, CAMERA_INITIAL_Y, controls.cameraDistance];
 
   return (
     <div className={styles.root} style={{ width, height }}>

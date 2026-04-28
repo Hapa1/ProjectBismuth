@@ -31,6 +31,7 @@ interface TilingControls {
 
 interface Controls {
   mode: Mode;
+  iridescent: boolean;
   branching: BranchingControls;
   spiral: SpiralControls;
   tiling: TilingControls;
@@ -38,6 +39,7 @@ interface Controls {
 
 const DEFAULTS: Controls = {
   mode: 'branching',
+  iridescent: true,
   branching: {
     depth: 8,
     angleDeg: 24,
@@ -69,6 +71,39 @@ const TAGLINES: Record<Mode, string> = {
 
 const SEGMENT_CAP = 60_000;
 
+// ---------------------------------------------------------------------------
+// Iridescent color — smooth cosine-palette gradient (violet ↔ teal ↔ blush)
+// ---------------------------------------------------------------------------
+
+function iridescentColor(
+  px: number,
+  py: number,
+  w: number,
+  h: number,
+): [number, number, number] {
+  // Normalised position with gentle spatial variation
+  const nx = px / w;
+  const ny = py / h;
+  const t =
+    nx * 0.55 +
+    ny * 0.45 +
+    Math.sin(nx * 3.1) * 0.08 +
+    Math.sin(ny * 2.7) * 0.06;
+
+  // Cosine palette: color(t) = a + b * cos(2π(c*t + d))
+  // Tuned for a narrow violet → teal → warm-blush band
+  const TAU = Math.PI * 2;
+  const r = 0.62 + 0.28 * Math.cos(TAU * (0.72 * t + 0.00));
+  const g = 0.54 + 0.22 * Math.cos(TAU * (0.72 * t + 0.35));
+  const b = 0.78 + 0.18 * Math.cos(TAU * (0.72 * t + 0.58));
+
+  return [
+    Math.round(Math.max(0, Math.min(1, r)) * 255),
+    Math.round(Math.max(0, Math.min(1, g)) * 255),
+    Math.round(Math.max(0, Math.min(1, b)) * 255),
+  ];
+}
+
 function mulberry32(a: number): () => number {
   let t = a >>> 0;
   return () => {
@@ -90,12 +125,20 @@ function drawBranching(
   width: number,
   height: number,
   c: BranchingControls,
+  iridescent: boolean,
 ): BranchStats {
   p.background(8, 9, 12);
   const stats: BranchStats = { segments: 0, capped: false };
   const rand = mulberry32(c.seed);
   const halfAngle = (c.angleDeg * Math.PI) / 180;
   const initialLength = Math.min(width, height) * 0.32;
+  const ctx = (p.drawingContext as CanvasRenderingContext2D);
+
+  // Collect segments first, then draw in two passes (halo + core) for glow.
+  const segments: Array<{
+    x1: number; y1: number; x2: number; y2: number;
+    sw: number; r: number; g: number; b: number;
+  }> = [];
 
   function recur(
     x: number,
@@ -113,9 +156,15 @@ function drawBranching(
     const x2 = x + Math.cos(angle) * length;
     const y2 = y + Math.sin(angle) * length;
     const sw = Math.max(0.4, depth * 0.55);
-    p.stroke(232, 234, 240, 235);
-    p.strokeWeight(sw);
-    p.line(x, y, x2, y2);
+    let sr: number, sg: number, sb: number;
+    if (iridescent) {
+      const mx = (x + x2) * 0.5;
+      const my = (y + y2) * 0.5;
+      [sr, sg, sb] = iridescentColor(mx, my, width, height);
+    } else {
+      sr = 232; sg = 234; sb = 240;
+    }
+    segments.push({ x1: x, y1: y, x2, y2, sw, r: sr, g: sg, b: sb });
     stats.segments++;
 
     const n = c.branches;
@@ -130,10 +179,51 @@ function drawBranching(
   const startX = width / 2;
   const startY = height - height * 0.06;
   recur(startX, startY, -Math.PI / 2, initialLength, c.depth);
+
+  if (iridescent) {
+    // Pass 1: wide soft halo with canvas shadowBlur
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const seg of segments) {
+      const color = `rgba(${seg.r | 0},${seg.g | 0},${seg.b | 0},0.25)`;
+      ctx.shadowColor = `rgb(${seg.r | 0},${seg.g | 0},${seg.b | 0})`;
+      ctx.shadowBlur = 18 + seg.sw * 4;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = seg.sw * 3;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(seg.x1, seg.y1);
+      ctx.lineTo(seg.x2, seg.y2);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // Pass 2: bright narrow core
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.shadowBlur = 0;
+    for (const seg of segments) {
+      ctx.strokeStyle = `rgba(${seg.r | 0},${seg.g | 0},${seg.b | 0},0.9)`;
+      ctx.lineWidth = seg.sw;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(seg.x1, seg.y1);
+      ctx.lineTo(seg.x2, seg.y2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  } else {
+    for (const seg of segments) {
+      p.stroke(seg.r, seg.g, seg.b, 235);
+      p.strokeWeight(seg.sw);
+      p.line(seg.x1, seg.y1, seg.x2, seg.y2);
+    }
+  }
+
   return stats;
 }
 
-function drawSpiral(p: P5, width: number, height: number, c: SpiralControls) {
+function drawSpiral(p: P5, width: number, height: number, c: SpiralControls, iridescent: boolean) {
   p.background(8, 9, 12);
   const cx = width / 2;
   const cy = height / 2;
@@ -146,18 +236,58 @@ function drawSpiral(p: P5, width: number, height: number, c: SpiralControls) {
   }
   const fit = maxNeeded > maxR ? maxR / maxNeeded : 1;
 
-  p.noStroke();
-  p.fill(232, 234, 240, 235);
-  for (let i = 0; i < c.count; i++) {
-    const r = c.scale * Math.sqrt(i) * fit;
-    const a = i * radians;
-    const x = cx + Math.cos(a) * r;
-    const y = cy + Math.sin(a) * r;
-    p.circle(x, y, c.dotSize);
+  if (iridescent) {
+    const ctx = (p.drawingContext as CanvasRenderingContext2D);
+
+    // Pass 1: soft halo
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < c.count; i++) {
+      const r = c.scale * Math.sqrt(i) * fit;
+      const a = i * radians;
+      const x = cx + Math.cos(a) * r;
+      const y = cy + Math.sin(a) * r;
+      const [cr, cg, cb] = iridescentColor(x, y, width, height);
+      const color = `rgb(${cr | 0},${cg | 0},${cb | 0})`;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 12 + c.dotSize * 2;
+      ctx.fillStyle = `rgba(${cr | 0},${cg | 0},${cb | 0},0.3)`;
+      ctx.beginPath();
+      ctx.arc(x, y, c.dotSize * 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // Pass 2: bright core
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.shadowBlur = 0;
+    for (let i = 0; i < c.count; i++) {
+      const r = c.scale * Math.sqrt(i) * fit;
+      const a = i * radians;
+      const x = cx + Math.cos(a) * r;
+      const y = cy + Math.sin(a) * r;
+      const [cr, cg, cb] = iridescentColor(x, y, width, height);
+      ctx.fillStyle = `rgba(${cr | 0},${cg | 0},${cb | 0},0.95)`;
+      ctx.beginPath();
+      ctx.arc(x, y, c.dotSize * 0.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  } else {
+    p.noStroke();
+    for (let i = 0; i < c.count; i++) {
+      const r = c.scale * Math.sqrt(i) * fit;
+      const a = i * radians;
+      const x = cx + Math.cos(a) * r;
+      const y = cy + Math.sin(a) * r;
+      p.fill(232, 234, 240, 235);
+      p.circle(x, y, c.dotSize);
+    }
   }
 }
 
-function drawTiling(p: P5, width: number, height: number, c: TilingControls) {
+function drawTiling(p: P5, width: number, height: number, c: TilingControls, iridescent: boolean) {
   const fillVal = Math.max(0, Math.min(60, c.fillBrightness));
   p.background(8, 9, 12);
 
@@ -179,6 +309,13 @@ function drawTiling(p: P5, width: number, height: number, c: TilingControls) {
   const cols = Math.ceil(width / w) + 2;
   const rows = Math.ceil(height / h) + 2;
 
+  // Collect hex data so we can draw glow in two passes
+  const hexes: Array<{
+    cx: number; cy: number;
+    verts: Array<[number, number]>;
+    er: number; eg: number; eb: number;
+  }> = [];
+
   for (let row = -1; row < rows; row++) {
     for (let col = -1; col < cols; col++) {
       const cx = col * w + (row % 2 === 0 ? 0 : w / 2);
@@ -192,17 +329,74 @@ function drawTiling(p: P5, width: number, height: number, c: TilingControls) {
         const dy = j2 * c.jitter * r;
         verts.push([cx + Math.cos(a) * r + dx, cy + Math.sin(a) * r + dy]);
       }
-      p.noStroke();
-      p.fill(fillVal, fillVal, fillVal + 4);
-      p.beginShape();
-      for (const [vx, vy] of verts) p.vertex(vx, vy);
-      p.endShape(p.CLOSE);
 
-      p.noFill();
-      p.stroke(167, 139, 250, Math.round(c.edgeAlpha * 255));
-      p.strokeWeight(1);
+      let er: number, eg: number, eb: number;
+      if (iridescent) {
+        [er, eg, eb] = iridescentColor(cx, cy, width, height);
+      } else {
+        er = 167; eg = 139; eb = 250;
+      }
+      hexes.push({ cx, cy, verts, er, eg, eb });
+    }
+  }
+
+  // Draw fills
+  p.noStroke();
+  for (const hex of hexes) {
+    p.fill(fillVal, fillVal, fillVal + 4);
+    p.beginShape();
+    for (const [vx, vy] of hex.verts) p.vertex(vx, vy);
+    p.endShape(p.CLOSE);
+  }
+
+  if (iridescent) {
+    const ctx = (p.drawingContext as CanvasRenderingContext2D);
+    const alpha = Math.round(c.edgeAlpha * 255);
+
+    // Pass 1: wide soft glow edges
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const hex of hexes) {
+      const color = `rgb(${hex.er | 0},${hex.eg | 0},${hex.eb | 0})`;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 14;
+      ctx.strokeStyle = `rgba(${hex.er | 0},${hex.eg | 0},${hex.eb | 0},${(alpha / 255 * 0.35).toFixed(3)})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      for (let k = 0; k < hex.verts.length; k++) {
+        const [vx, vy] = hex.verts[k];
+        if (k === 0) ctx.moveTo(vx, vy);
+        else ctx.lineTo(vx, vy);
+      }
+      ctx.closePath();
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // Pass 2: bright narrow core
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.shadowBlur = 0;
+    for (const hex of hexes) {
+      ctx.strokeStyle = `rgba(${hex.er | 0},${hex.eg | 0},${hex.eb | 0},${(alpha / 255 * 0.85).toFixed(3)})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let k = 0; k < hex.verts.length; k++) {
+        const [vx, vy] = hex.verts[k];
+        if (k === 0) ctx.moveTo(vx, vy);
+        else ctx.lineTo(vx, vy);
+      }
+      ctx.closePath();
+      ctx.stroke();
+    }
+    ctx.restore();
+  } else {
+    p.noFill();
+    p.stroke(167, 139, 250, Math.round(c.edgeAlpha * 255));
+    p.strokeWeight(1);
+    for (const hex of hexes) {
       p.beginShape();
-      for (const [vx, vy] of verts) p.vertex(vx, vy);
+      for (const [vx, vy] of hex.verts) p.vertex(vx, vy);
       p.endShape(p.CLOSE);
     }
   }
@@ -250,6 +444,7 @@ function GeometryBeneath({ width, height }: ProjectComponentProps) {
 
   useEffect(() => {
     controlsRef.current = controls;
+    sketchRef.current?.redraw();
   }, [controls]);
 
   useEffect(() => {
@@ -271,27 +466,30 @@ function GeometryBeneath({ width, height }: ProjectComponentProps) {
           const { width: w, height: h } = sizeRef.current;
           p.createCanvas(w, h);
           p.pixelDensity(Math.min(window.devicePixelRatio, 2));
+          p.noLoop();
         };
 
         p.draw = () => {
           const { width: w, height: h } = sizeRef.current;
           const c = controlsRef.current;
           if (c.mode === 'branching') {
-            const stats = drawBranching(p, w, h, c.branching);
+            const stats = drawBranching(p, w, h, c.branching, c.iridescent);
             const last = lastReportedRef.current;
             if (stats.segments !== last.segments || stats.capped !== last.capped) {
               lastReportedRef.current = stats;
               setBranchStats(stats);
             }
           } else if (c.mode === 'spiral') {
-            drawSpiral(p, w, h, c.spiral);
+            drawSpiral(p, w, h, c.spiral, c.iridescent);
           } else {
-            drawTiling(p, w, h, c.tiling);
+            drawTiling(p, w, h, c.tiling, c.iridescent);
           }
         };
       };
 
       sketchRef.current = new P5Constructor(sketch, host);
+      // Initial draw after p5 setup completes
+      requestAnimationFrame(() => sketchRef.current?.redraw());
     }
 
     void start();
@@ -307,6 +505,7 @@ function GeometryBeneath({ width, height }: ProjectComponentProps) {
     const instance = sketchRef.current;
     if (!instance) return;
     instance.resizeCanvas(width, height);
+    instance.redraw();
   }, [width, height]);
 
   const setMode = useCallback((mode: Mode) => {
@@ -355,6 +554,20 @@ function GeometryBeneath({ width, height }: ProjectComponentProps) {
             <option value="spiral">2 — Growth (spiral)</option>
             <option value="tiling">3 — Tiling (honeycomb)</option>
           </select>
+        </section>
+
+        <section className={styles.section}>
+          <label className={styles.toggleRow}>
+            <span className={styles.label}>Iridescent</span>
+            <input
+              type="checkbox"
+              className={styles.toggle}
+              checked={controls.iridescent}
+              onChange={(e) =>
+                setControls((prev) => ({ ...prev, iridescent: e.target.checked }))
+              }
+            />
+          </label>
         </section>
 
         {controls.mode === 'branching' && (

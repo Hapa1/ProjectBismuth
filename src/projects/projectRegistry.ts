@@ -10,6 +10,17 @@ interface RegistryEntry {
 export const projectRegistry: RegistryEntry[] = [
   {
     meta: {
+      id: 'bismuth',
+      title: 'Bismuth Simulator',
+      year: 2026,
+      renderer: 'three',
+      description: 'Recursive iridescent bismuth crystal growth.',
+      tags: ['three', 'shader', 'recursion'],
+    },
+    load: () => import('./bismuth'),
+  },
+  {
+    meta: {
       id: 'expanse',
       title: 'Expanse',
       year: 2026,
@@ -131,6 +142,17 @@ export const projectRegistry: RegistryEntry[] = [
   },
   {
     meta: {
+      id: 'monument-valley',
+      title: 'Monument Valley',
+      year: 2026,
+      renderer: 'p5',
+      description: 'Wave Function Collapse over a pastel isometric tileset, with an animated traversal path that walks the resulting structure.',
+      tags: ['p5', 'wfc', 'isometric', 'sprites', 'pathfinding'],
+    },
+    load: () => import('./monument-valley'),
+  },
+  {
+    meta: {
       id: 'geometry-beneath',
       title: 'Geometry Beneath Everything',
       year: 2026,
@@ -139,39 +161,6 @@ export const projectRegistry: RegistryEntry[] = [
       tags: ['p5', 'fractal', 'spiral', 'tiling', 'controls', 'presentation'],
     },
     load: () => import('./geometry-beneath'),
-  },
-  {
-    meta: {
-      id: 'sierpinski-3d',
-      title: 'Sierpinski Tetrahedron',
-      year: 2026,
-      renderer: 'three',
-      description: 'Self-similar fractal where each tetrahedron spawns four smaller copies. Interactive sliders for depth and scale.',
-      tags: ['three', 'fractal', '3d', 'controls', 'geometry'],
-    },
-    load: () => import('./sierpinski-3d'),
-  },
-  {
-    meta: {
-      id: 'bismuth',
-      title: 'Bismuth',
-      year: 2026,
-      renderer: 'three',
-      description: 'Branching recursive hopper-crystal structure with iridescent fresnel shading.',
-      tags: ['three', 'shader', 'fractal', 'iridescent', 'geometry'],
-    },
-    load: () => import('./bismuth'),
-  },
-  {
-    meta: {
-      id: 'cantor-2d',
-      title: 'Cantor Set',
-      year: 2026,
-      renderer: 'p5',
-      description: 'Animated fractal that removes the middle third at every iteration. Click to fold, or enable auto-animation.',
-      tags: ['p5', 'fractal', 'animation', 'controls', 'interactive'],
-    },
-    load: () => import('./cantor-2d'),
   },
 ];
 

@@ -363,27 +363,10 @@ function Prismata({ width, height }: ProjectComponentProps) {
   const audio = useAudioAnalyser();
   const meterRef = useRef<HTMLDivElement>(null);
 
-  // The presentation deck uses Prismata as a moving backdrop. Use a lighter
-  // profile there to keep transitions and narration smooth.
-  const isPresentationRoute =
-    typeof window !== 'undefined' && window.location.pathname === '/';
-  const isPerformanceMode = reduceMotion || isPresentationRoute;
   const showControlsPanel = true;
 
-  const sceneControls = useMemo(
-    () =>
-      isPerformanceMode
-        ? {
-            ...controls,
-            avgOrbitCount: Math.min(4, controls.avgOrbitCount),
-            bloomIntensity: Math.min(0.45, controls.bloomIntensity),
-          }
-        : controls,
-    [controls, isPerformanceMode],
-  );
-
   // Viewport-aware recursion depth — smaller phones get a shallower tree.
-  const maxDepth = isPerformanceMode ? (width < 480 ? 1 : 2) : width < 480 ? 2 : 3;
+  const maxDepth = width < 480 ? 2 : 3;
 
   // Camera pulls back on narrow screens so the whole structure fits.
   const camZ = width < 480 ? 5.6 : width < 1024 ? 4.8 : 4.2;
@@ -427,12 +410,12 @@ function Prismata({ width, height }: ProjectComponentProps) {
       <Canvas
         className={styles.canvasHost}
         camera={{ position: [0, 1.0, camZ], fov: 38, near: 0.1, far: 200 }}
-        gl={{ antialias: !isPerformanceMode, powerPreference: 'high-performance' }}
-        dpr={[1, Math.min(window.devicePixelRatio, isPerformanceMode ? 1.5 : 2)]}
+        gl={{ antialias: true, powerPreference: 'high-performance' }}
+        dpr={[1, Math.min(window.devicePixelRatio, 2)]}
       >
         <Scene
           bandsRef={audio.bands}
-          controls={sceneControls}
+          controls={controls}
           reduceMotion={reduceMotion}
           maxDepth={maxDepth}
         />
@@ -442,13 +425,13 @@ function Prismata({ width, height }: ProjectComponentProps) {
           minDistance={2.5}
           maxDistance={10}
         />
-        {sceneControls.bloomIntensity > 0.01 && (
+        {controls.bloomIntensity > 0.01 && (
           <EffectComposer>
             <Bloom
-              intensity={sceneControls.bloomIntensity}
+              intensity={controls.bloomIntensity}
               luminanceThreshold={0.18}
               luminanceSmoothing={0.6}
-              mipmapBlur={!isPerformanceMode}
+              mipmapBlur
               radius={0.7}
             />
           </EffectComposer>

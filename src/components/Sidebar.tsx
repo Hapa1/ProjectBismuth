@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Link, useRouterState } from '@tanstack/react-router';
 import { useUIStore } from '../state/uiStore';
 import { projectRegistry } from '../projects/projectRegistry';
+import { ProjectSymbol } from './ProjectSymbol';
 import styles from './Sidebar.module.css';
 
 export function Sidebar() {
@@ -104,7 +105,10 @@ export function Sidebar() {
                       data-active={isActive}
                       onClick={close}
                     >
-                      <span className={styles.navTitle}>{meta.title}</span>
+                      <span className={styles.navItemRow}>
+                        <ProjectSymbol id={meta.id} className={styles.navSymbol} />
+                        <span className={styles.navTitle}>{meta.title}</span>
+                      </span>
                       <span className={styles.navMeta}>
                         {meta.renderer} · {meta.year}
                       </span>

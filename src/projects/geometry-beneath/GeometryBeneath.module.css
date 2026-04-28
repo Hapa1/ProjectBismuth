@@ -134,6 +134,21 @@
   line-height: 1.4;
 }
 
+.toggleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.toggle {
+  width: 44px;
+  height: 24px;
+  accent-color: #a78bfa;
+  cursor: pointer;
+}
+
 @media (min-width: 768px) {
   .panel {
     left: auto;

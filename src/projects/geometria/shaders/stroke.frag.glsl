@@ -12,6 +12,7 @@ uniform float uPencilStrength;
 
 varying float vArc;
 varying vec2  vWorld;
+varying float vIntensityMod;
 
 // __PALETTE_CHUNKS__
 
@@ -37,5 +38,6 @@ void main() {
   // Tinted hot core.
   col += vec3(1.0, 0.85, 1.25) * head * 0.55;
 
-  gl_FragColor = vec4(col * uIntensity, 1.0);
+  // Apply per-vertex intensity modulation (dims Metatron's overlapping lines).
+  gl_FragColor = vec4(col * uIntensity * vIntensityMod, 1.0);
 }

@@ -33,7 +33,7 @@ export interface Phase {
 // ---------------------------------------------------------------------------
 
 export const BASE_RADIUS = 1.0;
-export const FRUIT_RADIUS = 0.34;
+export const FRUIT_RADIUS = 0.5;
 
 const TAU = Math.PI * 2;
 
@@ -166,6 +166,8 @@ export interface StrokeData {
   positions: Float32Array;
   /** Float32 global arc coordinate, 1 per vertex. */
   arcs: Float32Array;
+  /** Float32 per-vertex intensity modulator (0..1). Metatron lines are dimmed. */
+  intensityMods: Float32Array;
   /** Uint32 indices for triangle list. */
   indices: Uint32Array;
   /** Per-primitive metadata, in primitive draw order. */
@@ -214,6 +216,7 @@ export function buildStrokeData(): StrokeData {
 
   const positions: number[] = [];
   const arcs: number[] = [];
+  const intensityModsArr: number[] = [];
   const indices: number[] = [];
   const primitives: PrimitiveMeta[] = [];
   const phaseEdges: number[] = [];
@@ -228,6 +231,9 @@ export function buildStrokeData(): StrokeData {
     if (phase.primitives.length === 0) {
       return;
     }
+
+    // Metatron lines get reduced intensity to avoid blinding overlap.
+    const intensityMod = phase.id === 'metatron' ? 0.22 : 1.0;
 
     // Sample each primitive and compute its length so we can budget aArc.
     const samples = phase.primitives.map((p) =>
@@ -273,6 +279,7 @@ export function buildStrokeData(): StrokeData {
         positions.push(ax, ay, 0, bx, by, 0);
         const globalArc = aStart + localArcs[k] * (aEnd - aStart);
         arcs.push(globalArc, globalArc);
+        intensityModsArr.push(intensityMod, intensityMod);
       }
 
       // Stitch quads.
@@ -301,6 +308,7 @@ export function buildStrokeData(): StrokeData {
   return {
     positions: new Float32Array(positions),
     arcs: new Float32Array(arcs),
+    intensityMods: new Float32Array(intensityModsArr),
     indices: new Uint32Array(indices),
     primitives,
     phaseEdges,
