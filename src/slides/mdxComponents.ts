@@ -12,6 +12,7 @@ import { SymbolExhibits } from '../components/slides/exhibits/SymbolExhibits';
 import { ArtistCarousel } from '../components/slides/ArtistCarousel';
 import { SlideReveal } from '../components/slides/SlideReveal';
 import { ProjectLinks } from '../components/slides/ProjectLinks';
+import { SlideQRCode } from '../components/slides/SlideQRCode';
 
 /**
  * Components automatically available inside any slide MDX file. Authors can
@@ -44,4 +45,5 @@ export const slideMdxComponents: MDXComponents = {
   Annotation: SlideAnnotation,
   ArtistCarousel,
   ProjectLinks,
+  QRCode: SlideQRCode,
 };
