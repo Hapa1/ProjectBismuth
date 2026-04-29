@@ -88,7 +88,7 @@ export const projectRegistry: RegistryEntry[] = [
   {
     meta: {
       id: 'geometria',
-      title: 'Geometria',
+      title: 'Sacred Geometry',
       year: 2026,
       renderer: 'three',
       description: 'Iridescent construction of the sacred-geometry sequence — circle to Platonic solids — drawn by a glowing pencil tip.',

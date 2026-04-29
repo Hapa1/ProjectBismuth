@@ -7,6 +7,7 @@ import { useSlideContext } from '../SlideContext';
 import { SlideDemo } from '../SlideDemo';
 import styles from './SymbolExhibits.module.css';
 
+
 /**
  * Slide 2 visual: master/detail symbol explorer.
  *
@@ -22,6 +23,7 @@ export function SymbolExhibits() {
   const [activeId, setActiveId] = useState<string>(EXHIBITS[0]?.id ?? '');
   const [showImage, setShowImage] = useState(true);
   const [showControls, setShowControls] = useState(true);
+
   const active = useMemo(
     () => EXHIBITS.find((e) => e.id === activeId) ?? EXHIBITS[0],
     [activeId],
@@ -160,7 +162,7 @@ export function SymbolExhibits() {
                 </button>
               )}
 
-              {showImage && (
+              {showImage && (active.image || active.gallery || active.excerpt) && (
                 <figure className={styles.imageOverlay}>
                   <button
                     type="button"
@@ -171,25 +173,51 @@ export function SymbolExhibits() {
                   >
                     ×
                   </button>
-                  <img
-                    className={styles.image}
-                    src={active.image}
-                    alt={active.imageAlt}
-                    loading="eager"
-                    decoding="async"
-                  />
+                  {active.gallery ? (
+                    <div
+                      className={styles.galleryGrid}
+                      role="group"
+                      aria-label={`${active.label} — ${active.gallery.length} images`}
+                    >
+                      {active.gallery.map((item) => (
+                        <img
+                          key={item.src}
+                          className={styles.galleryGridImage}
+                          src={item.src}
+                          alt={item.alt}
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      ))}
+                    </div>
+                  ) : active.image ? (
+                    <img
+                      className={styles.image}
+                      src={active.image}
+                      alt={active.imageAlt}
+                      loading="eager"
+                      decoding="async"
+                    />
+                  ) : null}
                   <figcaption className={styles.caption}>
                     <strong className={styles.captionTitle}>{active.label}</strong>
-                    <span className={styles.captionCredit}>
-                      <a href={active.credit.sourceUrl} target="_blank" rel="noreferrer">
-                        {active.credit.author}
-                      </a>
-                      {' · '}
-                      <a href={active.credit.licenseUrl} target="_blank" rel="noreferrer">
-                        {active.credit.license}
-                      </a>
-                      {' · Wikimedia'}
-                    </span>
+                    {active.excerpt?.map((p, i) => (
+                      <p key={i} className={styles.captionExcerpt}>
+                        {p}
+                      </p>
+                    ))}
+                    {active.credit && (
+                      <span className={styles.captionCredit}>
+                        <a href={active.credit.sourceUrl} target="_blank" rel="noreferrer">
+                          {active.credit.author}
+                        </a>
+                        {' · '}
+                        <a href={active.credit.licenseUrl} target="_blank" rel="noreferrer">
+                          {active.credit.license}
+                        </a>
+                        {' · Wikimedia'}
+                      </span>
+                    )}
                   </figcaption>
                 </figure>
               )}

@@ -547,148 +547,192 @@ function drawTiling(p: P5, width: number, height: number, c: TilingControls, iri
 }
 
 // ---------------------------------------------------------------------------
-// Mandelbrot — CPU escape-time renderer drawn into an offscreen ImageData,
-// then blitted via drawImage. Uses adaptive sampling on small viewports.
+// Mandelbrot — GPU fragment shader (WebGL2). Renders a fullscreen triangle
+// and computes escape-time per pixel. Order of magnitude faster than CPU,
+// so we always render at full resolution with no fast/refine machinery.
 // ---------------------------------------------------------------------------
-let _mbCanvas: HTMLCanvasElement | null = null;
-let _mbCtx: CanvasRenderingContext2D | null = null;
 
-function getMandelbrotBuffer(w: number, h: number): {
-  canvas: HTMLCanvasElement;
-  ctx: CanvasRenderingContext2D;
-} {
-  if (!_mbCanvas || _mbCanvas.width !== w || _mbCanvas.height !== h) {
-    _mbCanvas = document.createElement('canvas');
-    _mbCanvas.width = w;
-    _mbCanvas.height = h;
-    _mbCtx = _mbCanvas.getContext('2d')!;
-  }
-  return { canvas: _mbCanvas, ctx: _mbCtx! };
+const MANDELBROT_VERT = `#version 300 es
+void main() {
+  vec2 p = vec2((gl_VertexID == 1) ? 3.0 : -1.0, (gl_VertexID == 2) ? 3.0 : -1.0);
+  gl_Position = vec4(p, 0.0, 1.0);
 }
+`;
 
-function drawMandelbrot(
-  p: P5,
-  width: number,
-  height: number,
-  c: MandelbrotControls,
-  iridescent: boolean,
-  coeffs: CosineCoeffs,
-  fast: boolean,
-) {
-  p.background(8, 9, 12);
+const MANDELBROT_FRAG = `#version 300 es
+precision highp float;
+uniform vec2 uResolution;
+uniform vec2 uCenter;
+uniform float uZoom;
+uniform float uMaxIter;
+uniform float uEscapeR;
+uniform float uContrast;
+uniform float uIridescent;
+uniform vec3 uA;
+uniform vec3 uB;
+uniform vec3 uC;
+uniform vec3 uD;
+out vec4 fragColor;
 
-  // Resolution cap: low during animation/interaction, high when idle.
-  const maxEdge = Math.max(width, height);
-  const cap = fast ? 820 : 1600;
-  const scale = maxEdge > cap ? cap / maxEdge : 1;
-  const rw = Math.max(2, Math.floor(width * scale));
-  const rh = Math.max(2, Math.floor(height * scale));
+vec3 sampleMandelbrot(vec2 c) {
+  // Cardioid + period-2 bulb early-out.
+  float xm = c.x - 0.25;
+  float q = xm * xm + c.y * c.y;
+  bool inSet = (q * (q + xm) <= 0.25 * c.y * c.y) ||
+               ((c.x + 1.0) * (c.x + 1.0) + c.y * c.y <= 0.0625);
 
-  const { canvas: buf, ctx: bctx } = getMandelbrotBuffer(rw, rh);
-  const img = bctx.createImageData(rw, rh);
-  const data = img.data;
-
-  // Map pixel space to complex plane: keep aspect, base view ~3.5 wide at zoom=1.
-  const baseSpan = 3.5;
-  const aspect = rw / rh;
-  const spanX = baseSpan / c.zoom;
-  const spanY = spanX / aspect;
-  const x0 = c.centerX - spanX / 2;
-  const y0 = c.centerY - spanY / 2;
-
-  const iterBoost = fast ? 0.15 : 0.5;
-  const maxIter = Math.max(
-    20,
-    Math.floor(c.maxIter * (1 + iterBoost * Math.log2(Math.max(1, c.zoom)))),
-  );
-  const escapeSq = Math.max(2, c.escapeR) * Math.max(2, c.escapeR);
-  const logEscape = Math.log(Math.max(2, c.escapeR));
-  const contrast = Math.max(0.2, c.contrast);
-
-  // Faster pixel writes via 32-bit view (little-endian: 0xAABBGGRR).
-  const buf32 = new Uint32Array(data.buffer);
-  const interiorColor = (255 << 24) | (12 << 16) | (7 << 8) | 6;
-
-  // 1D cosine palette: color depends purely on smooth iteration count, so
-  // bands follow the fractal instead of being smeared across the screen.
-  const TAU = Math.PI * 2;
-  const palette1D = (t: number): number => {
-    const r = coeffs.a[0] + coeffs.b[0] * Math.cos(TAU * (coeffs.c[0] * t + coeffs.d[0]));
-    const g = coeffs.a[1] + coeffs.b[1] * Math.cos(TAU * (coeffs.c[1] * t + coeffs.d[1]));
-    const b = coeffs.a[2] + coeffs.b[2] * Math.cos(TAU * (coeffs.c[2] * t + coeffs.d[2]));
-    const R = Math.round(Math.max(0, Math.min(1, r)) * 255);
-    const G = Math.round(Math.max(0, Math.min(1, g)) * 255);
-    const B = Math.round(Math.max(0, Math.min(1, b)) * 255);
-    return (255 << 24) | (B << 16) | (G << 8) | R;
-  };
-
-  // Precompute palette LUT (1024 entries) — avoids cosine cost per pixel.
-  const LUT_SIZE = 1024;
-  const lut = new Uint32Array(LUT_SIZE);
-  for (let i = 0; i < LUT_SIZE; i++) lut[i] = palette1D(i / LUT_SIZE);
-
-  for (let py = 0; py < rh; py++) {
-    const ci = y0 + (py / rh) * spanY;
-    for (let px = 0; px < rw; px++) {
-      const cr = x0 + (px / rw) * spanX;
-      const idx = py * rw + px;
-
-      // Fast interior tests: main cardioid and period-2 bulb. Points inside
-      // these regions are guaranteed to be in the set, so we skip iteration.
-      const xm = cr - 0.25;
-      const q = xm * xm + ci * ci;
-      if (q * (q + xm) <= 0.25 * ci * ci) {
-        buf32[idx] = interiorColor;
-        continue;
-      }
-      const xp1 = cr + 1;
-      if (xp1 * xp1 + ci * ci <= 0.0625) {
-        buf32[idx] = interiorColor;
-        continue;
-      }
-
-      let zr = 0;
-      let zi = 0;
-      let iter = 0;
-      let zr2 = 0;
-      let zi2 = 0;
-      while (iter < maxIter && zr2 + zi2 <= escapeSq) {
-        zi = 2 * zr * zi + ci;
-        zr = zr2 - zi2 + cr;
-        zr2 = zr * zr;
-        zi2 = zi * zi;
-        iter++;
-      }
-      if (iter >= maxIter) {
-        buf32[idx] = interiorColor;
-      } else {
-        // Smooth iteration count (continuous coloring).
-        const log_zn = Math.log(zr2 + zi2) * 0.5;
-        const nu = Math.log(log_zn / logEscape) / Math.LN2;
-        const smooth = Math.max(0, iter + 1 - nu);
-        // Log-spaced mapping keeps bands evenly spaced even at deep zoom and
-        // avoids the harsh wrap that produced neon noise. The cosine palette
-        // already oscillates, so we just feed it a smooth monotonic value.
-        const t = (Math.log(1 + smooth) / Math.log(1 + maxIter)) * contrast;
-        const tClamped = Math.max(0, Math.min(0.999, t));
-        if (iridescent) {
-          buf32[idx] = lut[(tClamped * LUT_SIZE) | 0];
-        } else {
-          const v = Math.round(255 * Math.pow(tClamped, 0.7));
-          buf32[idx] = (255 << 24) | (v << 16) | (v << 8) | v;
-        }
-      }
+  vec2 z = vec2(0.0);
+  float escapeSq = uEscapeR * uEscapeR;
+  float iter = 0.0;
+  bool escaped = false;
+  if (!inSet) {
+    for (int i = 0; i < 4096; i++) {
+      if (float(i) >= uMaxIter) break;
+      z = vec2(z.x * z.x - z.y * z.y, 2.0 * z.x * z.y) + c;
+      iter = float(i + 1);
+      if (dot(z, z) > escapeSq) { escaped = true; break; }
     }
   }
-  bctx.putImageData(img, 0, 0);
+  if (!escaped) return vec3(0.024, 0.027, 0.047);
 
-  const ctx = p.drawingContext as CanvasRenderingContext2D;
-  ctx.save();
-  // Always bilinear-smooth on upscale; keeps the fast pass from looking blocky.
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(buf, 0, 0, width, height);
-  ctx.restore();
+  float log_zn = log(dot(z, z)) * 0.5;
+  float nu = log(log_zn / log(uEscapeR)) / log(2.0);
+  float smoothIter = max(0.0, iter - nu);
+  float t = (log(1.0 + smoothIter) / log(1.0 + uMaxIter)) * uContrast;
+  t = clamp(t, 0.0, 0.999);
+
+  if (uIridescent > 0.5) {
+    const float TAU = 6.2831853;
+    return clamp(uA + uB * cos(TAU * (uC * t + uD)), 0.0, 1.0);
+  }
+  return vec3(pow(t, 0.7));
+}
+
+void main() {
+  // 2x2 rotated-grid supersampling. Four sub-samples per pixel softens
+  // boundary edges and band aliasing without blurring real detail.
+  vec2 frag = gl_FragCoord.xy;
+  float scale = 3.5 / uZoom;
+  float aspect = uResolution.x / uResolution.y;
+  vec2 px = vec2(scale * aspect, scale) / uResolution;
+  vec2 offsets[4] = vec2[4](
+    vec2(-0.25,  0.125),
+    vec2( 0.125, 0.25),
+    vec2( 0.25, -0.125),
+    vec2(-0.125, -0.25)
+  );
+  vec3 acc = vec3(0.0);
+  for (int i = 0; i < 4; i++) {
+    vec2 uv = ((frag + offsets[i]) / uResolution) - 0.5;
+    uv.x *= aspect;
+    vec2 c = uCenter + uv * scale;
+    acc += sampleMandelbrot(c);
+  }
+  fragColor = vec4(acc * 0.25, 1.0);
+}
+`;
+
+interface MandelbrotGL {
+  resize: (w: number, h: number, dpr: number) => void;
+  render: (c: MandelbrotControls, iridescent: boolean, coeffs: CosineCoeffs) => void;
+  dispose: () => void;
+}
+
+function createMandelbrotGL(canvas: HTMLCanvasElement): MandelbrotGL | null {
+  const gl = canvas.getContext('webgl2', {
+    antialias: false,
+    preserveDrawingBuffer: false,
+    powerPreference: 'high-performance',
+  });
+  if (!gl) return null;
+
+  const compile = (type: number, src: string) => {
+    const sh = gl.createShader(type)!;
+    gl.shaderSource(sh, src);
+    gl.compileShader(sh);
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+      const log = gl.getShaderInfoLog(sh);
+      gl.deleteShader(sh);
+      throw new Error(`Mandelbrot shader compile failed: ${log}`);
+    }
+    return sh;
+  };
+
+  const vs = compile(gl.VERTEX_SHADER, MANDELBROT_VERT);
+  const fs = compile(gl.FRAGMENT_SHADER, MANDELBROT_FRAG);
+  const prog = gl.createProgram()!;
+  gl.attachShader(prog, vs);
+  gl.attachShader(prog, fs);
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+    const log = gl.getProgramInfoLog(prog);
+    throw new Error(`Mandelbrot program link failed: ${log}`);
+  }
+  gl.deleteShader(vs);
+  gl.deleteShader(fs);
+
+  const vao = gl.createVertexArray()!; // empty VAO is fine for a vertex-id triangle.
+  const u = {
+    res: gl.getUniformLocation(prog, 'uResolution'),
+    center: gl.getUniformLocation(prog, 'uCenter'),
+    zoom: gl.getUniformLocation(prog, 'uZoom'),
+    maxIter: gl.getUniformLocation(prog, 'uMaxIter'),
+    escapeR: gl.getUniformLocation(prog, 'uEscapeR'),
+    contrast: gl.getUniformLocation(prog, 'uContrast'),
+    iridescent: gl.getUniformLocation(prog, 'uIridescent'),
+    a: gl.getUniformLocation(prog, 'uA'),
+    b: gl.getUniformLocation(prog, 'uB'),
+    c: gl.getUniformLocation(prog, 'uC'),
+    d: gl.getUniformLocation(prog, 'uD'),
+  };
+
+  let drawW = 1;
+  let drawH = 1;
+
+  return {
+    resize(w: number, h: number, dpr: number) {
+      const pw = Math.max(1, Math.floor(w * dpr));
+      const ph = Math.max(1, Math.floor(h * dpr));
+      if (canvas.width !== pw) canvas.width = pw;
+      if (canvas.height !== ph) canvas.height = ph;
+      canvas.style.width = `${w}px`;
+      canvas.style.height = `${h}px`;
+      drawW = pw;
+      drawH = ph;
+    },
+    render(c, iridescent, coeffs) {
+      gl.viewport(0, 0, drawW, drawH);
+      gl.useProgram(prog);
+      gl.bindVertexArray(vao);
+      const iterBoost = 0.5;
+      const effIter = Math.max(
+        20,
+        Math.min(
+          4000,
+          Math.floor(c.maxIter * (1 + iterBoost * Math.log2(Math.max(1, c.zoom)))),
+        ),
+      );
+      gl.uniform2f(u.res, drawW, drawH);
+      gl.uniform2f(u.center, c.centerX, c.centerY);
+      gl.uniform1f(u.zoom, Math.max(0.1, c.zoom));
+      gl.uniform1f(u.maxIter, effIter);
+      gl.uniform1f(u.escapeR, Math.max(2, c.escapeR));
+      gl.uniform1f(u.contrast, Math.max(0.2, c.contrast));
+      gl.uniform1f(u.iridescent, iridescent ? 1 : 0);
+      gl.uniform3fv(u.a, coeffs.a);
+      gl.uniform3fv(u.b, coeffs.b);
+      gl.uniform3fv(u.c, coeffs.c);
+      gl.uniform3fv(u.d, coeffs.d);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      gl.bindVertexArray(null);
+    },
+    dispose() {
+      gl.deleteProgram(prog);
+      gl.deleteVertexArray(vao);
+      const lose = gl.getExtension('WEBGL_lose_context');
+      lose?.loseContext();
+    },
+  };
 }
 
 interface SliderProps {
@@ -725,44 +769,63 @@ function SliderControl({ label, min, max, step, value, onChange, format }: Slide
 function GeometryBeneath({ width, height }: ProjectComponentProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const sketchRef = useRef<P5 | null>(null);
+  const glCanvasRef = useRef<HTMLCanvasElement>(null);
+  const glModRef = useRef<MandelbrotGL | null>(null);
+  const glReadyRef = useRef(false);
   const [controls, setControls] = useState<Controls>(DEFAULTS);
   const controlsRef = useRef<Controls>(controls);
   const sizeRef = useRef({ width, height });
   const [branchStats, setBranchStats] = useState<BranchStats>({ segments: 0, capped: false });
   const lastReportedRef = useRef<BranchStats>({ segments: 0, capped: false });
   const rafRef = useRef(0);
-  const refineTimerRef = useRef<number | null>(null);
-  const fastRef = useRef(false);
 
-  // Schedule a high-quality re-render after the user (or auto-zoom) stops.
-  const scheduleRefine = useCallback((delayMs: number) => {
-    if (refineTimerRef.current !== null) {
-      window.clearTimeout(refineTimerRef.current);
+  // Lazily create the WebGL Mandelbrot renderer the first time we need it.
+  const ensureGL = useCallback(() => {
+    if (glReadyRef.current) return glModRef.current;
+    const canvas = glCanvasRef.current;
+    if (!canvas) return null;
+    try {
+      const mod = createMandelbrotGL(canvas);
+      glModRef.current = mod;
+      glReadyRef.current = true;
+      if (mod) {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        mod.resize(sizeRef.current.width, sizeRef.current.height, dpr);
+      }
+      return mod;
+    } catch (err) {
+      console.warn('Mandelbrot WebGL init failed', err);
+      glReadyRef.current = true;
+      glModRef.current = null;
+      return null;
     }
-    refineTimerRef.current = window.setTimeout(() => {
-      refineTimerRef.current = null;
-      fastRef.current = false;
-      sketchRef.current?.redraw();
-    }, delayMs);
   }, []);
+
+  const renderMandelbrot = useCallback(() => {
+    const mod = ensureGL();
+    if (!mod) return;
+    const c = controlsRef.current;
+    mod.render(c.mandelbrot, c.iridescent, c.gradientCoeffs);
+  }, [ensureGL]);
 
   useEffect(() => {
     controlsRef.current = controls;
-    // Any control change is interactive: render fast first, refine after idle.
-    fastRef.current = true;
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     rafRef.current = requestAnimationFrame(() => {
       rafRef.current = 0;
-      sketchRef.current?.redraw();
+      if (controlsRef.current.mode === 'mandelbrot') {
+        renderMandelbrot();
+      } else {
+        sketchRef.current?.redraw();
+      }
     });
-    if (!controls.mandelbrot.autoZoom) scheduleRefine(180);
     return () => {
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = 0;
       }
     };
-  }, [controls, scheduleRefine]);
+  }, [controls, renderMandelbrot]);
 
   useEffect(() => {
     sizeRef.current = { width, height };
@@ -800,9 +863,9 @@ function GeometryBeneath({ width, height }: ProjectComponentProps) {
             drawSpiral(p, w, h, c.spiral, c.iridescent, c.gradientCoeffs);
           } else if (c.mode === 'tiling') {
             drawTiling(p, w, h, c.tiling, c.iridescent, c.gradientCoeffs);
-          } else {
-            drawMandelbrot(p, w, h, c.mandelbrot, c.iridescent, c.gradientCoeffs, fastRef.current);
           }
+          // mandelbrot mode is rendered by WebGL on a separate canvas, so
+          // p5 has nothing to do for that mode.
         };
       };
 
@@ -817,14 +880,30 @@ function GeometryBeneath({ width, height }: ProjectComponentProps) {
       cancelled = true;
       sketchRef.current?.remove();
       sketchRef.current = null;
+      glModRef.current?.dispose();
+      glModRef.current = null;
+      glReadyRef.current = false;
     };
   }, []);
 
   useEffect(() => {
     const instance = sketchRef.current;
-    if (!instance) return;
-    instance.resizeCanvas(width, height);
-    instance.redraw();
+    if (instance) {
+      instance.resizeCanvas(width, height);
+      if (controlsRef.current.mode !== 'mandelbrot') instance.redraw();
+    }
+    const mod = glModRef.current;
+    if (mod) {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      mod.resize(width, height, dpr);
+      if (controlsRef.current.mode === 'mandelbrot') {
+        mod.render(
+          controlsRef.current.mandelbrot,
+          controlsRef.current.iridescent,
+          controlsRef.current.gradientCoeffs,
+        );
+      }
+    }
   }, [width, height]);
 
   // Auto-zoom: smoothly drive zoom toward targetZoom while easing center
@@ -834,30 +913,38 @@ function GeometryBeneath({ width, height }: ProjectComponentProps) {
     if (controls.mode !== 'mandelbrot' || !controls.mandelbrot.autoZoom) return;
     let raf = 0;
     let last = performance.now();
+    let lastTick = 0;
+    // Throttle to ~24 fps so each fast render gets enough budget to look
+    // good. Going faster just produces more grainy frames per second; this
+    // trades fewer-but-cleaner frames, which the eye reads as smoother.
+    const minStep = 1000 / 24;
     const step = (now: number) => {
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
-      setControls((prev) => {
-        if (!prev.mandelbrot.autoZoom) return prev;
-        const m = prev.mandelbrot;
-        // Multiplicative zoom feels constant on a log scale: ~30% per second.
-        const nextZoom = Math.min(m.targetZoom, m.zoom * Math.exp(0.3 * dt));
-        // Ease center toward target proportional to remaining log-zoom.
-        const k = 1 - Math.exp(-1.2 * dt);
-        const cx = m.centerX + (m.targetX - m.centerX) * k;
-        const cy = m.centerY + (m.targetY - m.centerY) * k;
-        const reached = nextZoom >= m.targetZoom - 1e-6;
-        return {
-          ...prev,
-          mandelbrot: {
-            ...m,
-            zoom: nextZoom,
-            centerX: cx,
-            centerY: cy,
-            autoZoom: reached ? false : m.autoZoom,
-          },
-        };
-      });
+      if (now - lastTick >= minStep) {
+        lastTick = now;
+        setControls((prev) => {
+          if (!prev.mandelbrot.autoZoom) return prev;
+          const m = prev.mandelbrot;
+          // Multiplicative zoom feels constant on a log scale: ~30% per second.
+          const nextZoom = Math.min(m.targetZoom, m.zoom * Math.exp(0.3 * dt));
+          // Ease center toward target proportional to remaining log-zoom.
+          const k = 1 - Math.exp(-1.2 * dt);
+          const cx = m.centerX + (m.targetX - m.centerX) * k;
+          const cy = m.centerY + (m.targetY - m.centerY) * k;
+          const reached = nextZoom >= m.targetZoom - 1e-6;
+          return {
+            ...prev,
+            mandelbrot: {
+              ...m,
+              zoom: nextZoom,
+              centerX: cx,
+              centerY: cy,
+              autoZoom: reached ? false : m.autoZoom,
+            },
+          };
+        });
+      }
       raf = requestAnimationFrame(step);
     };
     raf = requestAnimationFrame(step);
@@ -915,7 +1002,29 @@ function GeometryBeneath({ width, height }: ProjectComponentProps) {
 
   return (
     <div className={styles.root}>
-      <div ref={hostRef} className={styles.canvasHost} />
+      <div className={styles.canvasHost} style={{ position: 'relative' }}>
+        <div
+          ref={hostRef}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: controls.mode === 'mandelbrot' ? 'none' : 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        />
+        <canvas
+          ref={glCanvasRef}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            display: controls.mode === 'mandelbrot' ? 'block' : 'none',
+          }}
+          aria-hidden="true"
+        />
+      </div>
 
       <aside className={styles.panel} aria-label="Geometry Beneath Everything controls">
         <h3 className={styles.panelTitle}>The Geometry Beneath Everything</h3>

@@ -38,10 +38,6 @@ export const presentationV2Registry: SlideRegistryEntry[] = [
     load: () => import('./content/07-audio-visualizers.mdx'),
   },
   {
-    meta: { id: 'v2-ai-vs-tool', title: 'AI Slop vs AI as a Tool' },
-    load: () => import('./content/08-ai-slop-vs-tool.mdx'),
-  },
-  {
     meta: { id: 'v2-workflow', title: 'The New Creative Workflow' },
     load: () => import('./content/09-workflow.mdx'),
   },

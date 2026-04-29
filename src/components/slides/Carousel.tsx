@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, useId } from 'react';
+import { useCallback, useRef, useState, useId } from 'react';
 import styles from './Carousel.module.css';
 
 // ---------------------------------------------------------------------------
@@ -56,31 +56,8 @@ export function Carousel({
   rightInset,
 }: CarouselProps) {
   const trackRef = useRef<HTMLDivElement | null>(null);
-  const [canPrev, setCanPrev] = useState(false);
-  const [canNext, setCanNext] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const trackId = useId();
-
-  const updateButtons = useCallback(() => {
-    const el = trackRef.current;
-    if (!el) return;
-    const max = el.scrollWidth - el.clientWidth;
-    setCanPrev(el.scrollLeft > 4);
-    setCanNext(el.scrollLeft < max - 4);
-  }, []);
-
-  useEffect(() => {
-    const el = trackRef.current;
-    if (!el) return;
-    updateButtons();
-    el.addEventListener('scroll', updateButtons, { passive: true });
-    const ro = new ResizeObserver(updateButtons);
-    ro.observe(el);
-    return () => {
-      el.removeEventListener('scroll', updateButtons);
-      ro.disconnect();
-    };
-  }, [updateButtons]);
 
   const scrollByCard = useCallback((direction: 1 | -1) => {
     const el = trackRef.current;
@@ -125,26 +102,7 @@ export function Carousel({
             >
               {collapsed ? '▲ Show' : '▼ Hide'}
             </button>
-            <div className={`${styles.controls} ${collapsed ? styles.controlsHidden : ''}`} aria-hidden="false">
-              <button
-                type="button"
-                className={styles.navButton}
-                onClick={() => scrollByCard(-1)}
-                disabled={!canPrev}
-                aria-label="Previous"
-              >
-                ←
-              </button>
-              <button
-                type="button"
-                className={styles.navButton}
-                onClick={() => scrollByCard(1)}
-                disabled={!canNext}
-                aria-label="Next"
-              >
-                →
-              </button>
-            </div>
+
           </div>
         </div>
 

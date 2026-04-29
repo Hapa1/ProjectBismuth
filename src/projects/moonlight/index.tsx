@@ -68,7 +68,7 @@ const DEFAULT_CONTROLS: Controls = {
   count: 600,
   spread: 24,
   baseHeight: 0.4,
-  heightVariance: 2.6,
+  heightVariance: 1.5,
   reactivity: 0.9,
   bandCount: 6,
   paletteIndex: 0,
@@ -175,27 +175,30 @@ interface CrystalsProps {
   bandsRef: React.MutableRefObject<AudioBands>;
 }
 
-function Crystals({ controls, palette, bandsRef }: CrystalsProps) {
-  const meshRef = useRef<THREE.InstancedMesh>(null!);
+// Threshold (relative to spread) at which crystals switch to the low-res LOD.
+const LOD_FRACTION = 0.55;
 
-  // Build a hexagonal prism (column from 0..1 in y) — base at y=0, tip at y=1
-  const geometry = useMemo(() => {
-    const radius = 0.5;
-    const sides = 6;
-    const positions: number[] = [];
-    const normals: number[] = [];
-    const indices: number[] = [];
+function buildCrystalGeometry(highRes: boolean): THREE.BufferGeometry {
+  const radius = 0.5;
+  const sides = 6;
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const indices: number[] = [];
 
-    const baseRing: THREE.Vector3[] = [];
-    const topRing: THREE.Vector3[] = [];
-    for (let i = 0; i < sides; i += 1) {
-      const a = (i / sides) * Math.PI * 2;
-      baseRing.push(new THREE.Vector3(Math.cos(a) * radius, 0, Math.sin(a) * radius));
-      topRing.push(new THREE.Vector3(Math.cos(a) * radius * 0.35, 0.92, Math.sin(a) * radius * 0.35));
-    }
-    const tip = new THREE.Vector3(0, 1.0, 0);
+  const baseRing: THREE.Vector3[] = [];
+  const topRing: THREE.Vector3[] = [];
+  for (let i = 0; i < sides; i += 1) {
+    const a = (i / sides) * Math.PI * 2;
+    baseRing.push(new THREE.Vector3(Math.cos(a) * radius, 0, Math.sin(a) * radius));
+    topRing.push(
+      new THREE.Vector3(Math.cos(a) * radius * 0.35, 0.92, Math.sin(a) * radius * 0.35),
+    );
+  }
+  const tip = new THREE.Vector3(0, 1.0, 0);
 
-    // Side faces (quad split into 2 triangles) base->top
+  if (highRes) {
+    // Side faces (quad split into 2 triangles). CCW from outside:
+    // b0 -> t0 -> t1 -> b1
     for (let i = 0; i < sides; i += 1) {
       const j = (i + 1) % sides;
       const b0 = baseRing[i];
@@ -204,42 +207,68 @@ function Crystals({ controls, palette, bandsRef }: CrystalsProps) {
       const t1 = topRing[j];
 
       const n = new THREE.Vector3()
-        .copy(b1).sub(b0)
-        .cross(new THREE.Vector3().copy(t0).sub(b0))
+        .copy(t0).sub(b0)
+        .cross(new THREE.Vector3().copy(t1).sub(b0))
         .normalize();
 
       const start = positions.length / 3;
-      [b0, b1, t1, t0].forEach((v) => {
+      [b0, t0, t1, b1].forEach((v) => {
         positions.push(v.x, v.y, v.z);
         normals.push(n.x, n.y, n.z);
       });
       indices.push(start, start + 1, start + 2, start, start + 2, start + 3);
     }
 
-    // Top pyramid faces
+    // Top pyramid faces (top ring -> tip), CCW from outside: t0 -> tip -> t1
     for (let i = 0; i < sides; i += 1) {
       const j = (i + 1) % sides;
       const t0 = topRing[i];
       const t1 = topRing[j];
       const n = new THREE.Vector3()
-        .copy(t1).sub(t0)
-        .cross(new THREE.Vector3().copy(tip).sub(t0))
+        .copy(tip).sub(t0)
+        .cross(new THREE.Vector3().copy(t1).sub(t0))
         .normalize();
       const start = positions.length / 3;
-      [t0, t1, tip].forEach((v) => {
+      [t0, tip, t1].forEach((v) => {
         positions.push(v.x, v.y, v.z);
         normals.push(n.x, n.y, n.z);
       });
       indices.push(start, start + 1, start + 2);
     }
+  } else {
+    // Low-res: side faces go directly base -> tip (6 tris). CCW from outside:
+    // b0 -> tip -> b1
+    for (let i = 0; i < sides; i += 1) {
+      const j = (i + 1) % sides;
+      const b0 = baseRing[i];
+      const b1 = baseRing[j];
+      const n = new THREE.Vector3()
+        .copy(tip).sub(b0)
+        .cross(new THREE.Vector3().copy(b1).sub(b0))
+        .normalize();
+      const start = positions.length / 3;
+      [b0, tip, b1].forEach((v) => {
+        positions.push(v.x, v.y, v.z);
+        normals.push(n.x, n.y, n.z);
+      });
+      indices.push(start, start + 1, start + 2);
+    }
+  }
 
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
-    geo.setIndex(indices);
-    geo.computeBoundingSphere();
-    return geo;
-  }, []);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  geo.setIndex(indices);
+  geo.computeBoundingSphere();
+  return geo;
+}
+
+function Crystals({ controls, palette, bandsRef }: CrystalsProps) {
+  const nearRef = useRef<THREE.InstancedMesh>(null!);
+  const farRef = useRef<THREE.InstancedMesh>(null!);
+
+  const geometryNear = useMemo(() => buildCrystalGeometry(true), []);
+  const geometryFar = useMemo(() => buildCrystalGeometry(false), []);
 
   const material = useMemo(() => {
     return new THREE.ShaderMaterial({
@@ -273,22 +302,31 @@ function Crystals({ controls, palette, bandsRef }: CrystalsProps) {
     material.uniforms.uTintC.value.copy(palette.c);
   }, [material, controls.reactivity, controls.bandCount, controls.moonHeight, palette]);
 
-  // Per-instance attributes recomputed when count/spread/heights change
+  // Per-instance attributes recomputed when count/spread/heights change.
+  // Crystals are split into a "near" set (full-detail geometry) and a "far"
+  // set (low-poly geometry) based on radial distance from the camera origin.
   useEffect(() => {
-    const mesh = meshRef.current;
-    if (!mesh) return;
+    const near = nearRef.current;
+    const far = farRef.current;
+    if (!near || !far) return;
 
     const count = controls.count;
-    const aHeight = new Float32Array(count);
-    const aHue = new Float32Array(count);
-    const aSeed = new Float32Array(count);
-    const aBand = new Float32Array(count);
+    const lodRadius = controls.spread * LOD_FRACTION;
+
+    interface Slot {
+      matrix: THREE.Matrix4;
+      height: number;
+      hue: number;
+      seed: number;
+      band: number;
+    }
+    const nearSlots: Slot[] = [];
+    const farSlots: Slot[] = [];
 
     const dummy = new THREE.Object3D();
     const rng = mulberry32(0xc0ffee);
 
     for (let i = 0; i < count; i += 1) {
-      // Cluster crystals in rings to suggest a landscape
       const r = Math.sqrt(rng()) * controls.spread;
       const theta = rng() * Math.PI * 2;
       const x = Math.cos(theta) * r;
@@ -299,29 +337,53 @@ function Crystals({ controls, palette, bandsRef }: CrystalsProps) {
       dummy.rotation.set(0, rng() * Math.PI * 2, 0);
       dummy.scale.set(scale, 1, scale);
       dummy.updateMatrix();
-      mesh.setMatrixAt(i, dummy.matrix);
 
-      aHeight[i] = controls.baseHeight + rng() * controls.heightVariance + r * 0.05;
-      aHue[i] = rng();
-      aSeed[i] = rng();
-      aBand[i] = Math.floor(rng() * 3); // 0=bass, 1=mid, 2=treble
+      const slot: Slot = {
+        matrix: dummy.matrix.clone(),
+        height: controls.baseHeight + rng() * controls.heightVariance + r * 0.05,
+        hue: rng(),
+        seed: rng(),
+        band: Math.floor(rng() * 3),
+      };
+
+      if (r < lodRadius) nearSlots.push(slot);
+      else farSlots.push(slot);
     }
 
-    mesh.instanceMatrix.needsUpdate = true;
-    const geo = mesh.geometry as THREE.InstancedBufferGeometry & THREE.BufferGeometry;
-    geo.setAttribute('aHeight', new THREE.InstancedBufferAttribute(aHeight, 1));
-    geo.setAttribute('aHue', new THREE.InstancedBufferAttribute(aHue, 1));
-    geo.setAttribute('aSeed', new THREE.InstancedBufferAttribute(aSeed, 1));
-    geo.setAttribute('aBand', new THREE.InstancedBufferAttribute(aBand, 1));
-    mesh.count = count;
+    const writeSlots = (mesh: THREE.InstancedMesh, slots: Slot[]) => {
+      const n = slots.length;
+      const aHeight = new Float32Array(n);
+      const aHue = new Float32Array(n);
+      const aSeed = new Float32Array(n);
+      const aBand = new Float32Array(n);
+      for (let i = 0; i < n; i += 1) {
+        const s = slots[i];
+        mesh.setMatrixAt(i, s.matrix);
+        aHeight[i] = s.height;
+        aHue[i] = s.hue;
+        aSeed[i] = s.seed;
+        aBand[i] = s.band;
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+      const geo = mesh.geometry as THREE.InstancedBufferGeometry & THREE.BufferGeometry;
+      geo.setAttribute('aHeight', new THREE.InstancedBufferAttribute(aHeight, 1));
+      geo.setAttribute('aHue', new THREE.InstancedBufferAttribute(aHue, 1));
+      geo.setAttribute('aSeed', new THREE.InstancedBufferAttribute(aSeed, 1));
+      geo.setAttribute('aBand', new THREE.InstancedBufferAttribute(aBand, 1));
+      mesh.count = n;
+    };
+
+    writeSlots(near, nearSlots);
+    writeSlots(far, farSlots);
   }, [controls.count, controls.spread, controls.baseHeight, controls.heightVariance]);
 
   useEffect(() => {
     return () => {
-      geometry.dispose();
+      geometryNear.dispose();
+      geometryFar.dispose();
       material.dispose();
     };
-  }, [geometry, material]);
+  }, [geometryNear, geometryFar, material]);
 
   useFrame((_, delta) => {
     const u = material.uniforms;
@@ -334,11 +396,18 @@ function Crystals({ controls, palette, bandsRef }: CrystalsProps) {
   });
 
   return (
-    <instancedMesh
-      ref={meshRef}
-      args={[geometry, material, controls.count]}
-      frustumCulled={false}
-    />
+    <>
+      <instancedMesh
+        ref={nearRef}
+        args={[geometryNear, material, controls.count]}
+        frustumCulled={false}
+      />
+      <instancedMesh
+        ref={farRef}
+        args={[geometryFar, material, controls.count]}
+        frustumCulled={false}
+      />
+    </>
   );
 }
 
@@ -418,8 +487,8 @@ function CameraRig({ drift, bandsRef }: CameraRigProps) {
     const bass = bandsRef.current.bass;
     camera.position.x = Math.sin(angle) * radius;
     camera.position.z = Math.cos(angle) * radius;
-    camera.position.y = 3.2 + Math.sin(t.current * 0.5) * 0.6 + bass * 0.5;
-    camera.lookAt(0, 2.2 + bass * 0.4, 0);
+    camera.position.y = 7.5 + Math.sin(t.current * 0.5) * 0.8 + bass * 0.5;
+    camera.lookAt(0, 2.6 + bass * 0.4, 0);
   });
 
   return null;
@@ -443,6 +512,13 @@ function mulberry32(seed: number): () => number {
 function Moonlight({ width, height }: ProjectComponentProps) {
   const [controls, setControls] = useState<Controls>(DEFAULT_CONTROLS);
   const audio = useAudioController();
+
+  // Auto-start the silent demo synth so the visualizer reacts on mount.
+  // The synth feeds the analyser tap only — no audible output.
+  useEffect(() => {
+    void audio.loadDemo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const meterRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -472,11 +548,6 @@ function Moonlight({ width, height }: ProjectComponentProps) {
     return () => cancelAnimationFrame(raf);
   }, [audio.bands]);
 
-  const onFile: React.ChangeEventHandler<HTMLInputElement> = (event) => {
-    const file = event.target.files?.[0];
-    if (file) void audio.loadFile(file);
-    event.target.value = '';
-  };
 
   return (
     <div className={styles.root} style={{ width, height }}>
@@ -484,7 +555,7 @@ function Moonlight({ width, height }: ProjectComponentProps) {
         <Canvas
           gl={{ antialias: true, powerPreference: 'high-performance' }}
           dpr={[1, Math.min(window.devicePixelRatio, 2)]}
-          camera={{ fov: 55, position: [0, 4, 14], near: 0.1, far: 200 }}
+          camera={{ fov: 55, position: [0, 8, 14], near: 0.1, far: 200 }}
         >
           <Scene controls={controls} bandsRef={audio.bands} />
         </Canvas>
@@ -499,13 +570,6 @@ function Moonlight({ width, height }: ProjectComponentProps) {
         <section className={styles.section}>
           <p className={styles.sectionTitle}>Audio Source</p>
           <div className={styles.audioGrid}>
-            <button
-              type="button"
-              className={`${styles.button} ${audio.source === 'demo' ? styles.buttonActive : ''}`}
-              onClick={() => void audio.loadDemo()}
-            >
-              Demo Pad
-            </button>
             <button
               type="button"
               className={`${styles.button} ${audio.source === 'mic' ? styles.buttonActive : ''}`}
@@ -527,15 +591,6 @@ function Moonlight({ width, height }: ProjectComponentProps) {
             >
               Tab Audio
             </button>
-            <label className={`${styles.button} ${styles.fileLabel} ${audio.source === 'file' ? styles.buttonActive : ''}`}>
-              Load File
-              <input
-                className={styles.fileInput}
-                type="file"
-                accept="audio/*"
-                onChange={onFile}
-              />
-            </label>
             <button
               type="button"
               className={styles.button}

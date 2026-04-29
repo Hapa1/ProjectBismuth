@@ -26,7 +26,7 @@ interface Controls {
 
 const DEFAULT_CONTROLS: Controls = {
   gridSize: 12,
-  stepsPerFrame: 24,
+  stepsPerFrame: 1,
   paused: false,
   autoRestart: true,
 };
@@ -36,9 +36,19 @@ type Phase =
   | 'collapsing-ground'
   | 'collapsing-mid'
   | 'collapsing-top'
+  | 'collapsing-stack'
   | 'collapsing-crown'
   | 'walking'
   | 'failed';
+
+/** Number of extra cube-stack layers placed above the `top` cube layer.
+ *  Total cube storeys = 2 (mid + top) + EXTRA_STACK_LAYERS. */
+const EXTRA_STACK_LAYERS = 2;
+
+interface StackPass {
+  wfc: Wfc2D | null;
+  collapsed: number[] | null;
+}
 
 interface SceneState {
   signature: string;
@@ -47,11 +57,18 @@ interface SceneState {
   ground: Wfc2D;
   mid: Wfc2D | null;
   top: Wfc2D | null;
+  /** Additional stacked-cube passes above the `top` layer. Each reuses the
+   *  top-layer variant set so the same shade-coupling rules apply. */
+  extraStacks: StackPass[];
+  /** Index of the extra-stack pass currently being collapsed. */
+  stackIdx: number;
   crown: Wfc2D | null;
   collapsedGround: number[] | null;
   collapsedMid: number[] | null;
   collapsedTop: number[] | null;
   collapsedCrown: number[] | null;
+  /** Rows (y indices) where pillars/columns are heavily biased to appear. */
+  pillarRows: ReadonlySet<number>;
   phase: Phase;
   tileW: number;
   tileH: number;
@@ -91,6 +108,7 @@ function buildCellBias(
   variants: readonly TileVariant[],
   layerIndices: readonly number[],
   emptyIndex: number,
+  pillarRows: ReadonlySet<number> = new Set<number>(),
 ): ReadonlyArray<ReadonlyMap<number, number>> {
   // Edge cells favour empty + plain floors. Center favours feature tiles.
   const bias: Map<number, number>[] = [];
@@ -99,19 +117,25 @@ function buildCellBias(
       const m = new Map<number, number>();
       const edgeDist = Math.min(x, y, width - 1 - x, depth - 1 - y);
       const isEdge = edgeDist <= 1;
+      const isPillarRow = pillarRows.has(y) && !isEdge;
       for (const idx of layerIndices) {
         const v = variants[idx];
         if (idx === emptyIndex) {
-          m.set(idx, isEdge ? 2.5 : 1.0);
+          // Pillar rows: down-weight empty so columns dominate the row.
+          m.set(idx, isPillarRow ? 0.25 : isEdge ? 2.5 : 1.0);
         } else if (v.baseId === 'floor-plain') {
           m.set(idx, isEdge ? 2.0 : 1.0);
         } else if (v.baseId === 'dais-stepped') {
           m.set(idx, isEdge ? 0.2 : 1.4);
+        } else if (v.baseId === 'column') {
+          // Columns are the headline feature on a pillar row, otherwise rare.
+          m.set(idx, isPillarRow ? 12 : 0.08);
         } else if (
           v.baseId === 'temple-balcony' ||
           v.baseId === 'crown-tower'
         ) {
-          m.set(idx, isEdge ? 0.4 : 1.5);
+          // Suppress big features in pillar rows so the colonnade stays clean.
+          m.set(idx, isPillarRow ? 0.05 : isEdge ? 0.4 : 1.5);
         }
       }
       bias.push(m);
@@ -491,7 +515,7 @@ function MonumentValleyProject({ width, height }: ProjectComponentProps) {
             sceneRef.current.signature !== wantSig ||
             lastGen !== generationRef.current
           ) {
-            sceneRef.current = createScene(ctrl, w, h, catalog, layerIdx);
+            sceneRef.current = createScene(ctrl, w, h, catalog, layerIdx, spritesRef.current);
             lastGen = generationRef.current;
           }
 
@@ -618,8 +642,28 @@ function createScene(
   height: number,
   catalog: readonly TileVariant[],
   layerIdx: LayerIndices,
+  cache: SpriteCache,
 ): SceneState {
   const W = ctrl.gridSize;
+  // Pick pillar rows (interior only). For small grids: 1 row; for large: 2.
+  // Rows are spaced apart so colonnades don't merge into a slab.
+  const pillarRows = new Set<number>();
+  const interiorMin = 2;
+  const interiorMax = W - 3;
+  if (interiorMax >= interiorMin) {
+    const first = interiorMin + Math.floor(Math.random() * (interiorMax - interiorMin + 1));
+    pillarRows.add(first);
+    if (W >= 12) {
+      // Place a second row at least 3 cells away.
+      for (let attempts = 0; attempts < 8; attempts++) {
+        const r = interiorMin + Math.floor(Math.random() * (interiorMax - interiorMin + 1));
+        if (Math.abs(r - first) >= 3) {
+          pillarRows.add(r);
+          break;
+        }
+      }
+    }
+  }
   const groundBias = buildCellBias(W, W, catalog, layerIdx.ground, layerIdx.emptyGround);
   const ground = new Wfc2D({
     width: W,
@@ -630,6 +674,22 @@ function createScene(
   });
 
   const geom = fitGeometry(width, height, W);
+  // Override layerHeight using the cube's actual body height. The cube sprite
+  // (sourceIndex 1) bbox top is the cube's roof apex; cache.diamondCy is the
+  // cube's base diamond center. Distance × world-scale = the gap-free lift
+  // between stacked storeys.
+  const cubeMeta = cache.meta[1];
+  let layerHeight = geom.layerHeight;
+  if (cubeMeta) {
+    const worldScale = geom.tileW / cache.diamondW;
+    // Sprites are anchored to their BASE diamond center. To stack flush, the
+    // next storey's base diamond must land on the current storey's TOP
+    // diamond center. The cube sprite's bbox top is the apex of the top
+    // diamond, so subtract half a diamond height (= diamondW / 4 for a 2:1
+    // isometric diamond) to reach the top diamond's center.
+    const cubeBodyPx = cache.diamondCy - cubeMeta.bboxY - cache.diamondW / 4;
+    if (cubeBodyPx > 0) layerHeight = Math.round(cubeBodyPx * worldScale);
+  }
 
   return {
     signature: `${W}:${width}x${height}`,
@@ -638,19 +698,129 @@ function createScene(
     ground,
     mid: null,
     top: null,
+    extraStacks: Array.from({ length: EXTRA_STACK_LAYERS }, () => ({ wfc: null, collapsed: null })),
+    stackIdx: 0,
     crown: null,
     collapsedGround: null,
     collapsedMid: null,
     collapsedTop: null,
     collapsedCrown: null,
+    pillarRows,
     phase: 'collapsing-ground',
     tileW: geom.tileW,
     tileH: geom.tileH,
-    layerHeight: geom.layerHeight,
+    layerHeight,
     originX: geom.originX,
     originY: geom.originY,
     doneTime: 0,
   };
+}
+
+function makeStackWfc(
+  W: number,
+  catalog: readonly TileVariant[],
+  layerIdx: LayerIndices,
+  prev: readonly number[],
+): Wfc2D {
+  // Shade-coupled bias for any stacked-cube pass (the original "top" pass and
+  // every additional storey above it). A stack-cube tile may sit on a `prev`
+  // cell only if their shades match; over a non-block prev cell, only
+  // `empty-top` is permitted.
+  const baseBias = buildCellBias(W, W, catalog, layerIdx.top, layerIdx.emptyTop);
+  const STACK_IDS = new Set<string>(['top-cube-coral', 'top-cube-lavender']);
+  const stackBias: Map<number, number>[] = [];
+  for (let y = 0; y < W; y++) {
+    for (let x = 0; x < W; x++) {
+      const m = new Map(baseBias[x + y * W]);
+      const prevVariant = catalog[prev[x + y * W]];
+      const prevShade = prevVariant.base.shade ?? 'neutral';
+      const prevIsBlock = prevVariant.base.isBlock === true;
+      for (const idx of layerIdx.top) {
+        if (idx === layerIdx.emptyTop) {
+          // Down-weight empty over a real block so a stack wins the roll.
+          if (prevIsBlock) m.set(idx, 0.4);
+          continue;
+        }
+        const v = catalog[idx];
+        const shade = v.base.shade ?? 'neutral';
+        if (shade !== 'neutral' && prevShade !== 'neutral' && shade !== prevShade) {
+          m.set(idx, 0);
+          continue;
+        }
+        if (STACK_IDS.has(v.baseId)) {
+          m.set(idx, prevIsBlock ? 6 : 0);
+        }
+      }
+      stackBias.push(m);
+    }
+  }
+  const wfc = new Wfc2D({
+    width: W,
+    depth: W,
+    catalog,
+    layerIndices: layerIdx.top,
+    cellBias: stackBias,
+  });
+  // Force-empty over any prev cell that is not a true block.
+  for (let y = 0; y < W; y++) {
+    for (let x = 0; x < W; x++) {
+      const v = catalog[prev[x + y * W]];
+      if (v.base.isBlock !== true) {
+        wfc.forceCollapse(x, y, layerIdx.emptyTop);
+      }
+    }
+  }
+  return wfc;
+}
+
+function makeCrownWfc(
+  W: number,
+  catalog: readonly TileVariant[],
+  layerIdx: LayerIndices,
+  prev: readonly number[],
+): Wfc2D {
+  const crownBias: Map<number, number>[] = [];
+  for (let y = 0; y < W; y++) {
+    for (let x = 0; x < W; x++) {
+      const m = new Map<number, number>();
+      const v = catalog[prev[x + y * W]];
+      const prevShade = v.base.shade ?? 'neutral';
+      const onStack = v.base.isBlock === true;
+      for (const idx of layerIdx.crown) {
+        if (idx === layerIdx.emptyCrown) {
+          m.set(idx, onStack ? 0.6 : 9);
+          continue;
+        }
+        if (!onStack) {
+          m.set(idx, 0);
+          continue;
+        }
+        const cShade = catalog[idx].base.shade ?? 'neutral';
+        if (cShade !== 'neutral' && prevShade !== 'neutral' && cShade !== prevShade) {
+          m.set(idx, 0);
+          continue;
+        }
+        m.set(idx, 4);
+      }
+      crownBias.push(m);
+    }
+  }
+  const wfc = new Wfc2D({
+    width: W,
+    depth: W,
+    catalog,
+    layerIndices: layerIdx.crown,
+    cellBias: crownBias,
+  });
+  for (let y = 0; y < W; y++) {
+    for (let x = 0; x < W; x++) {
+      const v = catalog[prev[x + y * W]];
+      if (v.base.isBlock !== true) {
+        wfc.forceCollapse(x, y, layerIdx.emptyCrown);
+      }
+    }
+  }
+  return wfc;
 }
 
 function advanceScene(
@@ -672,7 +842,7 @@ function advanceScene(
     if (scene.ground.done) {
       scene.collapsedGround = snapshotCollapsed(scene.ground);
       const W = scene.ground.width;
-      const midBias = buildCellBias(W, W, catalog, layerIdx.mid, layerIdx.emptyMid);
+      const midBias = buildCellBias(W, W, catalog, layerIdx.mid, layerIdx.emptyMid, scene.pillarRows);
       scene.mid = new Wfc2D({
         width: W,
         depth: W,
@@ -714,60 +884,7 @@ function advanceScene(
         scene.collapsedMid = snapshotCollapsed(scene.mid);
       }
       const W = scene.mid.width;
-      const baseTopBias = buildCellBias(W, W, catalog, layerIdx.top, layerIdx.emptyTop);
-      // Shade-coupled top bias: a top tile may sit on a mid cell only if their
-      // shades match (or top is shade-neutral). Forbid mismatches by zero weight.
-      // Additionally, when the mid cell is a roofed cube, strongly favour a
-      // stacked cube of the matching shade so the scene actually grows
-      // vertically (otherwise empty-top's high base weight wins ~80% of rolls).
-      const STACK_IDS = new Set<string>(['top-cube-coral', 'top-cube-lavender']);
-      const topBias: Map<number, number>[] = [];
-      for (let y = 0; y < W; y++) {
-        for (let x = 0; x < W; x++) {
-          const m = new Map(baseTopBias[x + y * W]);
-          const midVariant = catalog[scene.collapsedMid[x + y * W]];
-          const midShade = midVariant.base.shade ?? 'neutral';
-          const midIsBlock = midVariant.base.isBlock === true;
-          for (const idx of layerIdx.top) {
-            if (idx === layerIdx.emptyTop) {
-              // On a true block, sharply down-weight empty-top so a stack
-              // becomes the dominant outcome.
-              if (midIsBlock) m.set(idx, 0.4);
-              continue;
-            }
-            const topVariant = catalog[idx];
-            const topShade = topVariant.base.shade ?? 'neutral';
-            if (topShade !== 'neutral' && midShade !== 'neutral' && topShade !== midShade) {
-              m.set(idx, 0);
-              continue;
-            }
-            // Stack-cube tiles only over isBlock mid cells.
-            if (STACK_IDS.has(topVariant.baseId)) {
-              m.set(idx, midIsBlock ? 6 : 0);
-            }
-          }
-          topBias.push(m);
-        }
-      }
-      scene.top = new Wfc2D({
-        width: W,
-        depth: W,
-        catalog,
-        layerIndices: layerIdx.top,
-        cellBias: topBias,
-      });
-      // Force-empty top above any mid that is NOT a true block (cube-plain or
-      // temple-balcony). Walls, corners, arches, columns, stairs etc. cannot
-      // support stacked structures — only true blocks can.
-      for (let y = 0; y < W; y++) {
-        for (let x = 0; x < W; x++) {
-          const mIdx = scene.collapsedMid[x + y * W];
-          const mv = catalog[mIdx];
-          if (mv.base.isBlock !== true) {
-            scene.top.forceCollapse(x, y, layerIdx.emptyTop);
-          }
-        }
-      }
+      scene.top = makeStackWfc(W, catalog, layerIdx, scene.collapsedMid);
       scene.phase = 'collapsing-top';
     }
     return;
@@ -784,61 +901,41 @@ function advanceScene(
       return;
     }
     if (scene.collapsedGround && scene.collapsedMid && scene.collapsedTop) {
-      // ─── CROWN PASS ──────────────────────────────────────────────────
-      // Towers (crown-tower) only spawn over an isBlock top cell — i.e. on
-      // top of a stacked cube (top-cube-coral or top-cube-lavender). Above
-      // anything else, force empty-crown.
       const W2 = scene.top.width;
-      const crownBias: Map<number, number>[] = [];
-      for (let y = 0; y < W2; y++) {
-        for (let x = 0; x < W2; x++) {
-          const m = new Map<number, number>();
-          const tIdx = scene.collapsedTop[x + y * W2];
-          const tv = catalog[tIdx];
-          const topShade = tv.base.shade ?? 'neutral';
-          const onStack = tv.base.isBlock === true;
-          for (const idx of layerIdx.crown) {
-            if (idx === layerIdx.emptyCrown) {
-              // Sharp downweight when on a stack so the tower wins.
-              m.set(idx, onStack ? 0.6 : 9);
-              continue;
-            }
-            if (!onStack) {
-              m.set(idx, 0);
-              continue;
-            }
-            const cShade = catalog[idx].base.shade ?? 'neutral';
-            if (
-              cShade !== 'neutral' &&
-              topShade !== 'neutral' &&
-              cShade !== topShade
-            ) {
-              m.set(idx, 0);
-              continue;
-            }
-            m.set(idx, 4);
-          }
-          crownBias.push(m);
-        }
+      if (scene.extraStacks.length > 0) {
+        scene.extraStacks[0].wfc = makeStackWfc(W2, catalog, layerIdx, scene.collapsedTop);
+        scene.stackIdx = 0;
+        scene.phase = 'collapsing-stack';
+      } else {
+        scene.crown = makeCrownWfc(W2, catalog, layerIdx, scene.collapsedTop);
+        scene.phase = 'collapsing-crown';
       }
-      scene.crown = new Wfc2D({
-        width: W2,
-        depth: W2,
-        catalog,
-        layerIndices: layerIdx.crown,
-        cellBias: crownBias,
-      });
-      for (let y = 0; y < W2; y++) {
-        for (let x = 0; x < W2; x++) {
-          const tIdx = scene.collapsedTop[x + y * W2];
-          const tv = catalog[tIdx];
-          if (tv.base.isBlock !== true) {
-            scene.crown.forceCollapse(x, y, layerIdx.emptyCrown);
-          }
-        }
-      }
+    }
+  }
+
+  if (scene.phase === 'collapsing-stack') {
+    const pass = scene.extraStacks[scene.stackIdx];
+    if (!pass.wfc) return;
+    runWfc(pass.wfc, stepsPerFrame);
+    if (pass.wfc.failed) {
+      // Soft-fail: collapse remainder to empty-top so the scene continues.
+      pass.collapsed = new Array(pass.wfc.cells.length).fill(layerIdx.emptyTop);
+    } else if (pass.wfc.done) {
+      pass.collapsed = snapshotCollapsed(pass.wfc);
+    } else {
+      return;
+    }
+    const W2 = pass.wfc.width;
+    if (scene.stackIdx < scene.extraStacks.length - 1) {
+      // Build the next stack pass on top of this one.
+      scene.stackIdx += 1;
+      scene.extraStacks[scene.stackIdx].wfc = makeStackWfc(W2, catalog, layerIdx, pass.collapsed);
+    } else {
+      // Done with all extra stacks — build crown atop the topmost collapsed.
+      scene.crown = makeCrownWfc(W2, catalog, layerIdx, pass.collapsed);
       scene.phase = 'collapsing-crown';
     }
+    return;
   }
 
   if (scene.phase === 'collapsing-crown' && scene.crown) {
@@ -931,10 +1028,14 @@ function renderScene(
   p.noTint();
 
   for (const { x, y } of order) {
-    drawCellLayer(p, scene, cache, catalog, x, y, 0);
-    drawCellLayer(p, scene, cache, catalog, x, y, 1);
-    drawCellLayer(p, scene, cache, catalog, x, y, 2);
-    drawCellLayer(p, scene, cache, catalog, x, y, 3);
+    // Level numbering:
+    //   0 = ground, 1 = mid, 2 = top (first stacked cube),
+    //   3..(2 + extraStacks.length) = additional stacked cubes,
+    //   crown = last level.
+    const totalLevels = 3 + scene.extraStacks.length + 1;
+    for (let level = 0; level < totalLevels; level++) {
+      drawCellLayer(p, scene, cache, catalog, x, y, level);
+    }
   }
 }
 
@@ -946,38 +1047,53 @@ function drawCellLayer(
   catalog: readonly TileVariant[],
   x: number,
   y: number,
-  layerIdx: 0 | 1 | 2 | 3,
+  level: number,
 ): void {
   const W = scene.ground.width;
   const i = x + y * W;
   let variantIndex = -1;
-  if (layerIdx === 0 && scene.collapsedGround) {
-    variantIndex = scene.collapsedGround[i];
-  } else if (layerIdx === 0) {
-    const c = scene.ground.cells[i];
-    if (c.collapsed) variantIndex = c.options[0];
-  } else if (layerIdx === 1 && scene.collapsedMid) {
-    variantIndex = scene.collapsedMid[i];
-  } else if (layerIdx === 1 && scene.mid) {
-    const c = scene.mid.cells[i];
-    if (c.collapsed) variantIndex = c.options[0];
-  } else if (layerIdx === 2 && scene.collapsedTop) {
-    variantIndex = scene.collapsedTop[i];
-  } else if (layerIdx === 2 && scene.top) {
-    const c = scene.top.cells[i];
-    if (c.collapsed) variantIndex = c.options[0];
-  } else if (layerIdx === 3 && scene.collapsedCrown) {
-    variantIndex = scene.collapsedCrown[i];
-  } else if (layerIdx === 3 && scene.crown) {
-    const c = scene.crown.cells[i];
-    if (c.collapsed) variantIndex = c.options[0];
+  const crownLevel = 3 + scene.extraStacks.length;
+  if (level === 0) {
+    if (scene.collapsedGround) variantIndex = scene.collapsedGround[i];
+    else {
+      const c = scene.ground.cells[i];
+      if (c.collapsed) variantIndex = c.options[0];
+    }
+  } else if (level === 1) {
+    if (scene.collapsedMid) variantIndex = scene.collapsedMid[i];
+    else if (scene.mid) {
+      const c = scene.mid.cells[i];
+      if (c.collapsed) variantIndex = c.options[0];
+    }
+  } else if (level === 2) {
+    if (scene.collapsedTop) variantIndex = scene.collapsedTop[i];
+    else if (scene.top) {
+      const c = scene.top.cells[i];
+      if (c.collapsed) variantIndex = c.options[0];
+    }
+  } else if (level === crownLevel) {
+    if (scene.collapsedCrown) variantIndex = scene.collapsedCrown[i];
+    else if (scene.crown) {
+      const c = scene.crown.cells[i];
+      if (c.collapsed) variantIndex = c.options[0];
+    }
+  } else {
+    // Extra stacked cube layer.
+    const stackIdx = level - 3;
+    const pass = scene.extraStacks[stackIdx];
+    if (!pass) return;
+    if (pass.collapsed) variantIndex = pass.collapsed[i];
+    else if (pass.wfc) {
+      const c = pass.wfc.cells[i];
+      if (c.collapsed) variantIndex = c.options[0];
+    }
   }
   if (variantIndex < 0) return;
   const v = catalog[variantIndex];
   const meta = getVariantSprite(cache, v);
   if (!meta) return;
 
-  const { sx, sy } = worldToScreen(scene, x, y, layerIdx);
+  const { sx, sy } = worldToScreen(scene, x, y, level);
   // Single canonical scale for ALL sprites (sheet pixel → world pixel).
   const baseScale = scene.tileW / cache.diamondW;
   const renderScale = v.base.renderScale ?? 1;

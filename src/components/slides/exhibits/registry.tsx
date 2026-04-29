@@ -1,5 +1,5 @@
 import type { ExhibitDef } from './types';
-import { FlowerOfLifeScene } from './cells/FlowerOfLifeScene';
+import { GoldenRatioScene } from './cells/GoldenRatioScene';
 import { MandalaScene } from './cells/MandalaScene';
 import { RoseWindowScene } from './cells/RoseWindowScene';
 import { SpiralScene } from './cells/SpiralScene';
@@ -16,36 +16,32 @@ const fmt2 = (v: number) => v.toFixed(2);
 export const EXHIBITS: ExhibitDef[] = [
   {
     id: 'geometria',
-    label: 'Geometria — Euclid\'s Elements, 1482',
-    image: '/slides/symbols/geometria.jpg',
-    imageAlt: 'A page with marginalia from the first printed edition of Euclid\'s Elements, printed by Erhard Ratdolt in 1482.',
-    credit: {
-      author: 'Folger Shakespeare Library / Erhard Ratdolt',
-      license: 'CC BY-SA 4.0',
-      licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
-      sourceUrl: "https://commons.wikimedia.org/wiki/File:Euclid%27s_Elements,_1482.jpg",
-    },
+    label: 'Sacred Geometry',
+    imageAlt: 'A vertical carousel of original generative artwork studies.',
+    gallery: [
+      { src: '/slides/Dream1.png', alt: 'Dream study 1' },
+      { src: '/slides/Liquid1.png', alt: 'Liquid study 1' },
+      { src: '/slides/Griz1.png', alt: 'Griz study 1' },
+      { src: '/slides/Griz2.png', alt: 'Griz study 2' },
+    ],
     controls: [],
     projectId: 'geometria',
   },
   {
-    id: 'flower-of-life',
-    label: 'Flower of Life — Polish folk carving',
-    image: '/slides/symbols/flower-of-life.jpg',
-    imageAlt: 'Hexafoil rosette carved into a wooden cottage beam, Silesian Beskids, Poland.',
-    credit: {
-      author: 'Silar',
-      license: 'CC BY-SA 4.0',
-      licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
-      sourceUrl:
-        'https://commons.wikimedia.org/wiki/File:020210830_004259_Hexafoil,_Silesian_Beskids.jpg',
-    },
+    id: 'golden-ratio',
+    label: 'Golden Ratio — φ ≈ 1.6180339887',
+    imageAlt: 'Nested squares scaling by the golden ratio with the golden spiral.',
+    excerpt: [
+      'φ is the unique positive number where 1 + 1/φ = φ. Solve x² = x + 1 and you get φ = (1 + √5) / 2.',
+      'Each square in the construction is φ times larger than the one before. The spiral is built from quarter-circle arcs inside each square — an approximation of a true logarithmic spiral whose growth factor is φ per quarter turn.',
+      'It shows up wherever growth is self-similar: nautilus shells, sunflower seed packings, branching plants, even the rotation of galactic arms. Not because nature "knows" φ, but because φ is the fixed point of the simplest self-referential rule there is.',
+    ],
     controls: [
-      { id: 'rings', label: 'Rings', min: 1, max: 4, step: 1, default: 2, format: fmtInt },
-      { id: 'radius', label: 'Radius', min: 0.5, max: 1.4, step: 0.05, default: 1.0, format: fmt2 },
+      { id: 'iterations', label: 'Iterations', min: 2, max: 10, step: 1, default: 7, format: fmtInt },
+      { id: 'thickness', label: 'Thickness', min: 0.015, max: 0.08, step: 0.002, default: 0.03, format: fmt2 },
       { id: 'hue', label: 'Hue', min: 0, max: 6.28, step: 0.05, default: 0, format: fmt2 },
     ],
-    render: ({ params }) => <FlowerOfLifeScene params={params} />,
+    render: ({ params }) => <GoldenRatioScene params={params} />,
   },
   {
     id: 'mandala',

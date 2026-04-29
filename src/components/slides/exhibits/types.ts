@@ -38,12 +38,22 @@ export interface ExhibitDef {
   id: string;
   /** Title displayed beneath the photograph. */
   label: string;
-  /** Public-relative path to the source photograph. */
-  image: string;
+  /** Public-relative path to the source photograph. Optional when `gallery` is set. */
+  image?: string;
   /** Alt text for the photograph. */
-  imageAlt: string;
-  /** CC attribution metadata for the photograph. */
-  credit: Credit;
+  imageAlt?: string;
+  /** CC attribution metadata for the photograph. Optional for original/internal artwork. */
+  credit?: Credit;
+  /**
+   * Optional grid of images shown in place of the single `image`. Useful when an
+   * exhibit is illustrated by multiple references rather than one source photo.
+   */
+  gallery?: { src: string; alt: string }[];
+  /**
+   * Optional paragraphs of explanatory text shown below the title in the
+   * info overlay. Use for math/historical context that pairs with the scene.
+   */
+  excerpt?: string[];
   /** Slider definitions for this exhibit. Only used when `render` is provided. */
   controls: ControlDef[];
   /**

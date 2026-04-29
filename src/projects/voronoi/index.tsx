@@ -379,6 +379,13 @@ function Voronoi({ width, height }: ProjectComponentProps) {
   const reduceMotion = usePrefersReducedMotion();
   const [controls, setControls] = useState<Controls>(DEFAULTS);
   const audio = useAudioController();
+
+  // Auto-start the silent demo synth so the visualizer reacts on mount.
+  // The synth feeds the analyser tap only — no audible output.
+  useEffect(() => {
+    void audio.loadDemo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const meterRef = useRef<HTMLDivElement>(null);
   const pulseDecayRef = useRef(controls.pulseDecay);
 
@@ -432,12 +439,6 @@ function Voronoi({ width, height }: ProjectComponentProps) {
     return () => cancelAnimationFrame(raf);
   }, [audio.bands]);
 
-  const onFile: React.ChangeEventHandler<HTMLInputElement> = (event) => {
-    const file = event.target.files?.[0];
-    if (file) void audio.loadFile(file);
-    event.target.value = '';
-  };
-
   const reseed = () =>
     setControls((c) => ({ ...c, seed: Math.floor(Math.random() * 9999) }));
 
@@ -486,13 +487,6 @@ function Voronoi({ width, height }: ProjectComponentProps) {
           <div className={styles.audioGrid}>
             <button
               type="button"
-              className={`${styles.button} ${audio.source === 'demo' ? styles.buttonActive : ''}`}
-              onClick={() => void audio.loadDemo()}
-            >
-              Demo Pad
-            </button>
-            <button
-              type="button"
               className={`${styles.button} ${audio.source === 'mic' ? styles.buttonActive : ''}`}
               onClick={() => void audio.enableMic()}
             >
@@ -511,17 +505,6 @@ function Voronoi({ width, height }: ProjectComponentProps) {
             >
               Tab Audio
             </button>
-            <label
-              className={`${styles.button} ${styles.fileLabel} ${audio.source === 'file' ? styles.buttonActive : ''}`}
-            >
-              Load File
-              <input
-                className={styles.fileInput}
-                type="file"
-                accept="audio/*"
-                onChange={onFile}
-              />
-            </label>
             <button
               type="button"
               className={styles.button}

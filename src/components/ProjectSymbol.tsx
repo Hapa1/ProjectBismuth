@@ -28,6 +28,7 @@ const SYMBOLS: Record<string, () => React.JSX.Element> = {
   'geometry-beneath': GeometryBeneathSymbol,
   'sierpinski-3d': SierpinskiSymbol,
   'cantor-2d': CantorSymbol,
+  'monument-valley': MonumentValleySymbol,
 };
 
 export function ProjectSymbol({ id, className }: Props) {
@@ -346,6 +347,33 @@ function CantorSymbol() {
       {bars.map(({ x, w, y }, i) => (
         <line key={i} x1={x} y1={y} x2={x + w} y2={y} strokeWidth="5" strokeLinecap="butt" />
       ))}
+    </g>
+  );
+}
+
+// ── Monument Valley: isometric stepped tower ─────────────────────────
+function MonumentValleySymbol() {
+  // Three stacked isometric blocks, each smaller and offset upward,
+  // evoking the impossible architecture of the game.
+  const block = (cx: number, cy: number, w: number, h: number) => {
+    const hw = w / 2;
+    return (
+      <g key={`${cx}-${cy}`}>
+        {/* Top rhombus */}
+        <polygon points={`${cx},${cy - h} ${cx + hw},${cy - h + hw / 2} ${cx},${cy - h + hw} ${cx - hw},${cy - h + hw / 2}`} />
+        {/* Left face */}
+        <polygon points={`${cx - hw},${cy - h + hw / 2} ${cx},${cy - h + hw} ${cx},${cy + hw} ${cx - hw},${cy + hw / 2}`} />
+        {/* Right face */}
+        <polygon points={`${cx + hw},${cy - h + hw / 2} ${cx},${cy - h + hw} ${cx},${cy + hw} ${cx + hw},${cy + hw / 2}`} />
+      </g>
+    );
+  };
+
+  return (
+    <g>
+      {block(0, 22, 44, 12)}
+      {block(0, 4, 32, 12)}
+      {block(0, -12, 20, 12)}
     </g>
   );
 }

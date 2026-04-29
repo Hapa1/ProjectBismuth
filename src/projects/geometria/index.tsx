@@ -34,7 +34,6 @@ const strokeFrag = strokeFragTemplate.replace(
 
 const BASE_SPEED = 1 / 70; // full sweep takes ~70s at base speed
 const FAST_MULT = 8;
-const HOLD_AT_END = 4; // seconds held on completed construction before looping
 
 interface ControllerState {
   reveal: number;
@@ -146,15 +145,10 @@ function StrokeRibbon({
         c.reveal = next;
       }
 
-      // Hold-at-end + loop.
+      // Hold-at-end — once the construction reaches the Platonic Solids it
+      // stays there. (Previously this looped back to the empty circle.)
       if (c.reveal >= 1 - 1e-4) {
         c.holdT += delta;
-        if (c.holdT >= HOLD_AT_END) {
-          c.holdT = 0;
-          c.reveal = 0;
-          c.target = 1;
-          c.fast = false;
-        }
       } else {
         c.holdT = 0;
       }

@@ -3,29 +3,29 @@ export const meta = {
   title: 'The New Creative Workflow',
 };
 
-<Demo projectId="prismata" />
+<Demo projectId="monument-valley" />
 
 <Overlay position="bottom-left">
-  <Eyebrow>You can literally just ask</Eyebrow>
-  <Title>Idea → Prompt → Scene → Personalize</Title>
+  <Eyebrow>Prompting becomes a pipeline</Eyebrow>
+  <Title>Gemini made the tileset. AI coding built the scene.</Title>
   <Body>
-    No syntax. No shaders. No three.js knowledge required. Describe what you
-    want in plain English — Claude or Copilot writes the code, runs it, and
-    you iterate from there.
-  </Body>
-  <Prompt label="What you'd type">
-{`"Build me a React + three.js scene of a recursive cloud
-of floating crystal shapes — tetrahedra, cubes, octahedra —
-orbiting each other in glowing iridescent rings.
-
-Make the colors shift like oil on water. Make it react to
-music: bass pulses the size, treble shifts the colors, the
-beat triggers a flash. Add a gentle bloom glow."`}
-  </Prompt>
-  <Body>
-    Then learn the code line by line and make it yours: your colors, your
-    references, your music, your timing, your glitches.
+    Gemini generated the isometric assets — stairs, arches, palace pieces —
+    then a coding model assembled them into this Wave Function Collapse sketch.
+    AI as collaborator, not creator.
   </Body>
 </Overlay>
+
+<Annotation position="top-right">
+  <img
+    src="/slides/TilesetProcess.png"
+    alt="Gemini generating the isometric tileset for Monument Valley."
+    style={{
+      display: 'block',
+      width: 'min(22rem, 50vw)',
+      maxWidth: '100%',
+      borderRadius: '0.5rem',
+    }}
+  />
+</Annotation>
 
 

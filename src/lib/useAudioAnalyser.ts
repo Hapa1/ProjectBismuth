@@ -11,7 +11,6 @@ export interface AudioController {
   bands: React.MutableRefObject<AudioBands>;
   isActive: boolean;
   source: AudioSourceKind;
-  loadFile: (file: File) => Promise<void>;
   enableMic: () => Promise<void>;
   captureTab: () => Promise<void>;
   loadDemo: () => Promise<void>;
@@ -20,7 +19,7 @@ export interface AudioController {
   setSmoothing: (value: number) => void;
 }
 
-export type AudioSourceKind = 'none' | 'demo' | 'file' | 'mic' | 'tab';
+export type AudioSourceKind = 'none' | 'demo' | 'mic' | 'tab';
 
 const ZERO_BANDS: AudioBands = { bass: 0, mid: 0, treble: 0, level: 0 };
 
@@ -49,8 +48,15 @@ export function useAudioAnalyser(): AudioController {
       analyser.smoothingTimeConstant = 0.82;
       const gain = ctx.createGain();
       gain.gain.value = 0.9;
+      // Split analysis tap from audible output. Anything on `gain` is
+      // both analyzed AND played to the speakers via outGain → destination.
+      // Sources that should be silent (demo, mic) connect to `analyser`
+      // directly instead of `gain`, which feeds the analyser tap only.
+      const outGain = ctx.createGain();
+      outGain.gain.value = 1;
       gain.connect(analyser);
-      analyser.connect(ctx.destination);
+      gain.connect(outGain);
+      outGain.connect(ctx.destination);
       ctxRef.current = ctx;
       analyserRef.current = analyser;
       gainRef.current = gain;
@@ -137,25 +143,6 @@ export function useAudioAnalyser(): AudioController {
     setSource('none');
   };
 
-  const loadFile = async (file: File) => {
-    const ctx = ensureContext();
-    if (ctx.state === 'suspended') await ctx.resume();
-    tearDownSource();
-
-    const audio = new Audio();
-    audio.crossOrigin = 'anonymous';
-    audio.loop = true;
-    audio.src = URL.createObjectURL(file);
-    elementRef.current = audio;
-    const node = ctx.createMediaElementSource(audio);
-    node.connect(gainRef.current!);
-    sourceNodeRef.current = node;
-    await audio.play();
-    startLoop();
-    setSource('file');
-    setIsActive(true);
-  };
-
   const enableMic = async () => {
     const ctx = ensureContext();
     if (ctx.state === 'suspended') await ctx.resume();
@@ -215,7 +202,10 @@ export function useAudioAnalyser(): AudioController {
 
     // Soundbath: multiple singing bowl voices with inharmonic partials,
     // periodic strike envelopes, gentle vibrato, and a long reverb tail.
-    const target = gainRef.current!;
+    //
+    // Route into the analyser tap only (NOT through gain → outGain → destination)
+    // so the synth drives the band data without producing any audible output.
+    const target = analyserRef.current!;
 
     // Master bus — kept quiet; the gain node (gainRef) adds its own level on top
     const master = ctx.createGain();
@@ -341,7 +331,6 @@ export function useAudioAnalyser(): AudioController {
     bands: bandsRef,
     isActive,
     source,
-    loadFile,
     enableMic,
     captureTab,
     loadDemo,

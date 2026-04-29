@@ -51,7 +51,6 @@ export type BaseTileId =
   | 'empty-mid'
   | 'cube-plain'
   | 'temple-balcony'
-  | 'walls-L-tall'
   | 'stairs-high'
   | 'stairs-low'
   | 'ramp'
@@ -196,16 +195,6 @@ export const BASE_TILES: readonly BaseTile[] = [
     shade: 'lavender',
     hasRoof: true,
     isBlock: true,
-  },
-  {
-    id: 'walls-L-tall',
-    layer: 'mid',
-    symmetry: 'X',
-    sourceIndex: 11,
-    sockets: ['air', 'air', 'wall-coral', 'wall-coral'],
-    weight: 0.5,
-    shade: 'coral',
-    hasRoof: true,
   },
   {
     id: 'stairs-high',

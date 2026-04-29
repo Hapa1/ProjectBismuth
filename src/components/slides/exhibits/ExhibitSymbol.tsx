@@ -14,7 +14,7 @@ interface Props {
 
 const SYMBOLS: Record<string, () => React.JSX.Element> = {
   geometria: GeometriaIcon,
-  'flower-of-life': FlowerOfLifeIcon,
+  'golden-ratio': GoldenRatioIcon,
   mandala: MandalaIcon,
   'rose-window': RoseWindowIcon,
   spiral: SpiralIcon,
@@ -60,36 +60,82 @@ function GeometriaIcon() {
   );
 }
 
-// ── Flower of Life: 19-circle hexafoil with bounding hexagon ────────
-function FlowerOfLifeIcon() {
-  const r = 12;
-  const centers: [number, number][] = [[0, 0]];
-  // First ring (6)
-  for (let i = 0; i < 6; i++) {
-    const a = (i / 6) * Math.PI * 2;
-    centers.push([Math.cos(a) * r, Math.sin(a) * r]);
+// ── Golden Ratio: nested φ-rectangles + golden spiral ───────────────
+function GoldenRatioIcon() {
+  const PHI = (1 + Math.sqrt(5)) / 2;
+  type Rect = { x: number; y: number; size: number; quadrant: number };
+  const rects: Rect[] = [];
+  const arcs: { cx: number; cy: number; r: number; start: number }[] = [];
+  let size = 8;
+  let cx = 0;
+  let cy = 0;
+  const dirs: Array<[number, number]> = [
+    [1, 0],
+    [0, 1],
+    [-1, 0],
+    [0, -1],
+  ];
+  const iters = 6;
+  for (let i = 0; i < iters; i += 1) {
+    const dir = dirs[i % 4];
+    rects.push({ x: cx - size / 2, y: cy - size / 2, size, quadrant: i });
+    arcs.push({
+      cx: cx - (dir[0] * size) / 2,
+      cy: cy - (dir[1] * size) / 2,
+      r: size,
+      start: (i % 4) * (Math.PI / 2) + Math.PI,
+    });
+    const next = size * PHI;
+    cx += (dir[0] * (size + next)) / 2;
+    cy += (dir[1] * (size + next)) / 2;
+    size = next;
   }
-  // Second ring (12) — alternating outer & corner positions
-  for (let i = 0; i < 6; i++) {
-    const a = (i / 6) * Math.PI * 2;
-    centers.push([Math.cos(a) * r * 2, Math.sin(a) * r * 2]);
-    const a2 = a + Math.PI / 6;
-    centers.push([
-      Math.cos(a2) * r * Math.sqrt(3),
-      Math.sin(a2) * r * Math.sqrt(3),
-    ]);
+
+  // Fit into the icon viewBox (-50..50 with padding).
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const r of rects) {
+    minX = Math.min(minX, r.x);
+    minY = Math.min(minY, r.y);
+    maxX = Math.max(maxX, r.x + r.size);
+    maxY = Math.max(maxY, r.y + r.size);
   }
+  const pad = 84;
+  const span = Math.max(maxX - minX, maxY - minY);
+  const fit = pad / span;
+  const ox = (minX + maxX) / 2;
+  const oy = (minY + maxY) / 2;
+  const tx = (v: number) => (v - ox) * fit;
+  // Flip Y so the spiral coils visually anchor toward bottom (matches typical illustrations).
+  const ty = (v: number) => -(v - oy) * fit;
+
+  // Build spiral path.
+  const path: string[] = [];
+  arcs.forEach((a, i) => {
+    const samples = 16;
+    for (let s = 0; s <= samples; s += 1) {
+      const t = a.start + (s / samples) * (Math.PI / 2);
+      const x = tx(a.cx + Math.cos(t) * a.r);
+      const y = ty(a.cy + Math.sin(t) * a.r);
+      path.push(`${i === 0 && s === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`);
+    }
+  });
+
   return (
     <g>
-      {centers.map(([x, y], i) => (
-        <circle
+      {rects.map((r, i) => (
+        <rect
           key={i}
-          cx={x.toFixed(2)}
-          cy={y.toFixed(2)}
-          r={r}
-          strokeWidth="1.8"
+          x={tx(r.x).toFixed(2)}
+          y={ty(r.y + r.size).toFixed(2)}
+          width={(r.size * fit).toFixed(2)}
+          height={(r.size * fit).toFixed(2)}
+          strokeWidth="1.6"
         />
       ))}
+      <path d={path.join(' ')} strokeWidth="2.6" />
     </g>
   );
 }

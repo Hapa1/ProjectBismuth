@@ -50,6 +50,7 @@ interface Controls {
   bloomIntensity: number;
   pulseMode: PulseMode;
   pulseSpeed: number;
+  sustainDrone: boolean;
 }
 
 const DEFAULTS: Controls = {
@@ -63,6 +64,7 @@ const DEFAULTS: Controls = {
   bloomIntensity: 0.75,
   pulseMode: 'ripple',
   pulseSpeed: 8.0,
+  sustainDrone: true,
 };
 
 // ---------------------------------------------------------------------------
@@ -424,6 +426,14 @@ function BeatDriver({ bandsRef, sharedRef, dims, controls }: BeatDriverProps) {
   // positions instead of pure white-noise scatter.
   const noiseT = useRef(Math.random() * 100);
 
+  // Drone tracking: rolling mean + variance of bass to detect "constant" signal.
+  const bassMean = useRef(0);
+  const bassVar = useRef(0);
+  const droneActive = useRef(false);
+  const droneTimer = useRef(0);
+  const dronePos = useRef<{ x: number; y: number } | null>(null);
+  const droneHue = useRef(Math.random());
+
   useFrame((_, delta) => {
     const dt = Math.min(delta, 0.1);
     const b = bandsRef.current;
@@ -438,6 +448,19 @@ function BeatDriver({ bandsRef, sharedRef, dims, controls }: BeatDriverProps) {
     // their fluctuations to peek above the average.
     slowEnv.current = slowEnv.current * 0.985 + b.bass * 0.015;
 
+    // Rolling mean/variance of bass over ~1s window for drone detection.
+    const meanAlpha = 0.06;
+    const prevMean = bassMean.current;
+    bassMean.current = prevMean + meanAlpha * (b.bass - prevMean);
+    const dev = b.bass - bassMean.current;
+    bassVar.current = bassVar.current + meanAlpha * (dev * dev - bassVar.current);
+    const bassStdDev = Math.sqrt(bassVar.current);
+    // "Constant bass" = meaningful level with low relative variation.
+    const droneEligible =
+      controls.sustainDrone &&
+      bassMean.current > 0.12 &&
+      bassStdDev < bassMean.current * 0.22;
+
     lastBeat.current += dt;
     sinceAnyPulse.current += dt;
 
@@ -448,6 +471,66 @@ function BeatDriver({ bandsRef, sharedRef, dims, controls }: BeatDriverProps) {
       b.bass > 0.08 &&
       fastEnv.current > slowEnv.current * threshold &&
       lastBeat.current > refractory;
+
+    // ---- Drone stream: when bass is steady, keep firing from a locked spot.
+    if (droneEligible && !transient) {
+      if (!droneActive.current) {
+        droneActive.current = true;
+        droneTimer.current = 0;
+        const ripple = controls.pulseMode === 'ripple';
+        if (ripple) {
+          const t = noiseT.current;
+          const nx = Math.sin(t * 0.71 + 1.3) * 0.6 + Math.sin(t * 1.73 + 4.1) * 0.4;
+          const ny = Math.sin(t * 0.93 + 2.7) * 0.6 + Math.sin(t * 1.31 + 0.5) * 0.4;
+          dronePos.current = {
+            x: nx * dims.worldHalfW * 0.7,
+            y: ny * dims.worldHalfH * 0.7,
+          };
+        } else {
+          dronePos.current = {
+            x: (Math.random() * 2 - 1) * dims.worldHalfW * 0.85,
+            y: (Math.random() * 2 - 1) * dims.worldHalfH * 0.85,
+          };
+        }
+        droneHue.current = hueSeed.current;
+      }
+
+      droneTimer.current += dt;
+      // Steady cadence — slightly modulated by current bass level so louder
+      // sustained passages emit faster.
+      const cadence = Math.max(0.18, 0.5 - bassMean.current * 0.6);
+      if (droneTimer.current >= cadence && dronePos.current) {
+        droneTimer.current = 0;
+        sinceAnyPulse.current = 0;
+
+        const pulses = sharedRef.current.pulses;
+        if (pulses.length >= MAX_PULSES) pulses.shift();
+
+        const ripple = controls.pulseMode === 'ripple';
+        const intensity = Math.min(2.5, 0.9 + bassMean.current * 1.4);
+
+        const dirs: [number, number, number, number] = [0, 0, 0, 0];
+        if (ripple) {
+          dirs[0] = dirs[1] = dirs[2] = dirs[3] = 1;
+        } else {
+          dirs[0] = dirs[1] = dirs[2] = dirs[3] = 1;
+        }
+
+        pulses.push({
+          pos: new THREE.Vector2(dronePos.current.x, dronePos.current.y),
+          intensity,
+          hue: droneHue.current,
+          age: 0,
+          dirs,
+        });
+      }
+      return;
+    }
+    // Drop out of drone mode when bass is no longer constant or a transient hits.
+    if (droneActive.current && (!droneEligible || transient)) {
+      droneActive.current = false;
+      dronePos.current = null;
+    }
 
     // Heartbeat fallback: if we haven't fired a pulse in a while but there IS
     // signal, emit a softer pulse so continuous sources (pads, drones) still
@@ -565,6 +648,13 @@ function Lattice({ width, height }: ProjectComponentProps) {
   const dims = useMemo(() => gridDimsFor(width, height), [width, height]);
   const [controls, setControls] = useState<Controls>(DEFAULTS);
   const audio = useAudioController();
+
+  // Auto-start the silent demo synth so the visualizer reacts on mount.
+  // The synth feeds the analyser tap only — no audible output.
+  useEffect(() => {
+    void audio.loadDemo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const meterRef = useRef<HTMLDivElement>(null);
   const pulseDecayRef = useRef(controls.pulseDecay);
   const controlsRef = useRef(controls);
@@ -617,11 +707,6 @@ function Lattice({ width, height }: ProjectComponentProps) {
     return () => cancelAnimationFrame(raf);
   }, [audio.bands]);
 
-  const onFile: React.ChangeEventHandler<HTMLInputElement> = (event) => {
-    const file = event.target.files?.[0];
-    if (file) void audio.loadFile(file);
-    event.target.value = '';
-  };
 
   return (
     <div className={styles.root} style={{ width, height }}>
@@ -668,13 +753,6 @@ function Lattice({ width, height }: ProjectComponentProps) {
           <div className={styles.audioGrid}>
             <button
               type="button"
-              className={`${styles.button} ${audio.source === 'demo' ? styles.buttonActive : ''}`}
-              onClick={() => void audio.loadDemo()}
-            >
-              Demo Pad
-            </button>
-            <button
-              type="button"
               className={`${styles.button} ${audio.source === 'mic' ? styles.buttonActive : ''}`}
               onClick={() => void audio.enableMic()}
             >
@@ -693,17 +771,6 @@ function Lattice({ width, height }: ProjectComponentProps) {
             >
               Tab Audio
             </button>
-            <label
-              className={`${styles.button} ${styles.fileLabel} ${audio.source === 'file' ? styles.buttonActive : ''}`}
-            >
-              Load File
-              <input
-                className={styles.fileInput}
-                type="file"
-                accept="audio/*"
-                onChange={onFile}
-              />
-            </label>
             <button
               type="button"
               className={styles.button}
@@ -759,6 +826,16 @@ function Lattice({ width, height }: ProjectComponentProps) {
             value={controls.beatThreshold}
             onChange={(v) => setControls((c) => ({ ...c, beatThreshold: v }))}
           />
+          <button
+            type="button"
+            className={`${styles.button} ${controls.sustainDrone ? styles.buttonActive : ''}`}
+            onClick={() =>
+              setControls((c) => ({ ...c, sustainDrone: !c.sustainDrone }))
+            }
+            title="When bass is steady, keep emitting from a fixed location instead of stopping."
+          >
+            Sustain Drone: {controls.sustainDrone ? 'On' : 'Off'}
+          </button>
         </section>
 
         <section className={styles.section}>

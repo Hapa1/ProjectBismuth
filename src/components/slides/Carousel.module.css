@@ -16,21 +16,22 @@
 
 .wrap {
   position: absolute;
-  top: 42%;
+  bottom: calc(44px + 1.25rem);
   left: 0;
   right: 0;
-  bottom: 0;
   z-index: 3;
-  padding: 0.5rem 0.5rem calc(44px + 1.25rem);
+  padding: 0.5rem;
   pointer-events: none;
-  overflow: hidden;
+  /* Center and fit to number of cards */
+  width: max-content;
+  max-width: calc(100% - 1rem);
+  margin: 0 auto;
 }
 
 @media (min-width: 768px) {
   .wrap {
     right: var(--carousel-right-inset, 0px);
-    padding: clamp(0.75rem, 2vw, 1.25rem);
-    top: 38%;
+    padding: clamp(0.5rem, 1.5vw, 0.75rem);
   }
 }
 
@@ -66,8 +67,8 @@
     ),
     rgba(14, 14, 20, 0.28);
 
-  backdrop-filter: blur(28px) saturate(180%) brightness(1.04);
-  -webkit-backdrop-filter: blur(28px) saturate(180%) brightness(1.04);
+  backdrop-filter: blur(8px) saturate(140%) brightness(1.02);
+  -webkit-backdrop-filter: blur(8px) saturate(140%) brightness(1.02);
 
   border: 1px solid rgba(255, 255, 255, 0.16);
 
@@ -83,8 +84,7 @@
   pointer-events: auto;
   color: var(--color-text);
 
-  /* Fill wrap height so track can flex-grow */
-  height: 100%;
+  height: auto;
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -97,15 +97,7 @@
 
 /* When collapsed the wrap doesn't need to fill from top */
 .wrapCollapsed {
-  top: auto;
-  bottom: 0;
-}
-
-@media (min-width: 768px) {
-  .wrapCollapsed {
-    top: auto;
-    bottom: 0;
-  }
+  bottom: 0.5rem;
 }
 
 /* --------------------------------------------------------------------------
@@ -217,9 +209,6 @@
  * -------------------------------------------------------------------------- */
 
 .track {
-  flex: 1;
-  min-height: 0;
-
   display: flex;
   gap: 0.75rem;
   overflow-x: auto;
