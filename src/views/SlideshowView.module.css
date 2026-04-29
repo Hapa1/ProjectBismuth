@@ -22,25 +22,39 @@
   display: none;
 }
 
-/* Floating menu button (mobile only) */
+/* Floating menu button (mobile only). On desktop the sidebar is persistent
+   so this button is hidden — see media query below. */
 .menuBtn {
   position: fixed;
-  top: 1rem;
-  left: 1rem;
+  top: max(0.75rem, env(safe-area-inset-top, 0px));
+  left: max(0.75rem, env(safe-area-inset-left, 0px));
   z-index: 50;
-  min-width: 44px;
-  min-height: 44px;
-  padding: 0 0.75rem;
-  border-radius: 8px;
-  background: rgba(10, 10, 10, 0.55);
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 10px;
+  background: rgba(10, 10, 10, 0.6);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   color: var(--color-text);
   font-size: 1.25rem;
+  line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
+}
+
+.menuBtn:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+@media (min-width: 1024px) {
+  .menuBtn {
+    display: none;
+  }
 }
 
 /* Top progress bar — fills as you advance through the deck. */

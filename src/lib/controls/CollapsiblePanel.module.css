@@ -1,0 +1,65 @@
+/* Floating settings/gear toggle button rendered when the controls panel
+   is collapsed. Sits in the same corner the panel would occupy so opening
+   the panel visually replaces it. */
+.toggle {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(10, 10, 10, 0.7);
+  color: var(--color-text);
+  cursor: pointer;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  z-index: 30;
+  pointer-events: auto;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .toggle:hover {
+    background: rgba(20, 20, 20, 0.85);
+  }
+}
+
+.toggle:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* Close button placed inside the panel so the user can dismiss it. The
+   project's own panel CSS supplies positioning/background — this only
+   provides the floating "x" affordance in the top-right of the panel. */
+.close {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-text);
+  cursor: pointer;
+  z-index: 5;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .close:hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+}
+
+.close:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}

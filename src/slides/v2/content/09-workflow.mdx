@@ -7,43 +7,37 @@ import styles from './09-workflow.module.css';
 
 <Demo projectId="monument-valley" />
 
-<div className={styles.wrap}>
-  <div className={styles.panel}>
-    <header className={styles.header}>
-      <p className={styles.eyebrow}>Prompting becomes a pipeline</p>
-      <h1 className={styles.title}>Gemini made the tileset. Copilot built the scene.</h1>
-    </header>
+<Overlay position="bottom-left">
+  <Eyebrow>Prompting becomes a pipeline</Eyebrow>
+  <Title>Gemini made the tileset. Copilot built the scene.</Title>
 
-    <figure className={styles.imageFrame}>
-      <img
-        className={styles.image}
-        src="/slides/TilesetProcess.png"
-        alt="Gemini generating an isometric Monument Valley tileset."
-      />
-    </figure>
+  <figure className={styles.imageFrame}>
+    <img
+      className={styles.image}
+      src="/slides/TilesetProcess.png"
+      alt="Gemini generating an isometric Monument Valley tileset."
+    />
+  </figure>
 
-    <div className={styles.prompts}>
-      <div className={styles.step}>
-        <p className={styles.stepLabel}>Step 1 · Prompt to Gemini</p>
-        <pre className={styles.stepBody}>{`"Generate a 4×6 isometric tileset sheet —
+  <div className={styles.prompts}>
+    <div className={styles.step}>
+      <p className={styles.stepLabel}>Step 1 · Prompt to Gemini</p>
+      <pre className={styles.stepBody}>{`"Generate a 4×6 isometric tileset sheet —
 stairs, arches, columns, palace pieces.
 Plain off-white background, no labels."`}</pre>
-      </div>
+    </div>
 
-      <div className={styles.step}>
-        <p className={styles.stepLabel}>Step 2 · Prompt to Copilot</p>
-        <pre className={styles.stepBody}>{`"Use this tileset to build a Monument
+    <div className={styles.step}>
+      <p className={styles.stepLabel}>Step 2 · Prompt to Copilot</p>
+      <pre className={styles.stepBody}>{`"Use this tileset to build a Monument
 Valley–style scene in p5.js with Wave
 Function Collapse. Show each tile collapse
 in, then walk a figure across the result."`}</pre>
-      </div>
     </div>
-
-    <p className={styles.footer}>
-      AI as collaborator, not creator — it generates the assets and the starter
-      code; I direct the system, the pacing, and the final composition.
-    </p>
   </div>
-</div>
 
-
+  <Body>
+    AI as collaborator, not creator — it generates the assets and the starter
+    code; I direct the system, the pacing, and the final composition.
+  </Body>
+</Overlay>

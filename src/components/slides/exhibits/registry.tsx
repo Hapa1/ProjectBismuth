@@ -4,7 +4,6 @@ import { MandalaScene } from './cells/MandalaScene';
 import { RoseWindowScene } from './cells/RoseWindowScene';
 import { SpiralScene } from './cells/SpiralScene';
 import { IslamicTileScene } from './cells/IslamicTileScene';
-import { VesicaPiscisScene } from './cells/VesicaPiscisScene';
 
 const fmtInt = (v: number) => Math.round(v).toString();
 const fmt2 = (v: number) => v.toFixed(2);
@@ -115,23 +114,5 @@ export const EXHIBITS: ExhibitDef[] = [
       { id: 'rotation', label: 'Rotation', min: 0, max: 3.14, step: 0.05, default: 0, format: fmt2 },
     ],
     render: ({ params }) => <IslamicTileScene params={params} />,
-  },
-  {
-    id: 'vesica-piscis',
-    label: 'Vesica Piscis — Chalice Well, Glastonbury',
-    image: '/slides/symbols/vesica-piscis.jpg',
-    imageAlt: 'Wrought-iron cover of the Chalice Well showing the vesica piscis.',
-    credit: {
-      author: 'Theangryblackwoman',
-      license: 'CC BY-SA 3.0',
-      licenseUrl: 'https://creativecommons.org/licenses/by-sa/3.0/',
-      sourceUrl: 'https://commons.wikimedia.org/wiki/File:Chalice_Well_Cover.jpg',
-    },
-    controls: [
-      { id: 'separation', label: 'Separation', min: 0.2, max: 1.6, step: 0.05, default: 0.7, format: fmt2 },
-      { id: 'ratio', label: 'Radius ratio', min: 0.5, max: 1.5, step: 0.05, default: 1.0, format: fmt2 },
-      { id: 'hue', label: 'Hue', min: 0, max: 6.28, step: 0.05, default: 0, format: fmt2 },
-    ],
-    render: ({ params }) => <VesicaPiscisScene params={params} />,
   },
 ];

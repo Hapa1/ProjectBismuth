@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type P5 from 'p5';
 import type { ProjectComponentProps } from '../../types/project';
 import styles from './Expanse.module.css';
+import { useRandomize } from '../../lib/useRandomize';
 
 type PaletteName = 'rag-belur' | 'cc238' | 'dale-paddle' | 'ducci-x';
 type ShadingMode = 'realistic' | 'palette';
@@ -89,6 +90,9 @@ function ExpanseAnimated({ width, height }: ProjectComponentProps) {
   const hoverStateRef = useRef<HoverState>({ map: new Map(), lastTime: 0 });
   const [controls, setControls] = useState<Controls>(DEFAULT_CONTROLS);
 
+  const randomize = () => setControls((prev) => ({ ...prev, seed: createSeed() }));
+  useRandomize(randomize);
+
   useEffect(() => {
     controlsRef.current = controls;
   }, [controls]);
@@ -157,7 +161,7 @@ function ExpanseAnimated({ width, height }: ProjectComponentProps) {
             <button
               className={styles.button}
               type="button"
-              onClick={() => setControls((prev) => ({ ...prev, seed: createSeed() }))}
+              onClick={randomize}
             >
               Randomize
             </button>

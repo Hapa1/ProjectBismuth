@@ -279,6 +279,34 @@
   }
 }
 
+/* --------------------------------------------------------------------------
+ * Gallery panel — mobile-first override of `.imageOverlay` for exhibits
+ * that have a `gallery` array.
+ *
+ * Mobile (< 1024px): docked to the bottom of the viewport, full width,
+ * horizontal filmstrip. Sits above the canvas so the WebGL stage and
+ * hero image (if any) remain visible.
+ *
+ * Desktop (>= 1024px): pivots to a right-side column docked to the full
+ * height of the viewport, like the controls panel. The strip becomes
+ * vertical (see media query at the end of this file).
+ * -------------------------------------------------------------------------- */
+.galleryPanel {
+  /* Reset the top-left absolute positioning from `.imageOverlay`. */
+  top: auto;
+  left: 0.6rem;
+  right: 0.6rem;
+  bottom: 0.6rem;
+  width: auto;
+  max-height: none;
+}
+
+/* Make the close button less obtrusive when docked. */
+.galleryPanel > .closeButton {
+  top: 0.3rem;
+  right: 0.3rem;
+}
+
 .image {
   width: 100%;
   aspect-ratio: 1;
@@ -304,32 +332,49 @@
   border: 1px solid rgba(167, 139, 250, 0.18);
 }
 
-/* Gallery grid — auto-fit as many square thumbnails as the overlay width
- * allows. Scrolls vertically if the count exceeds available height. */
-.galleryGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
-  gap: 0.3rem;
+/* Gallery strip — mobile-first.
+ *
+ * Mobile (< 1024px): horizontal scroll-snap filmstrip docked to the bottom
+ * of the viewport (see `.galleryPanel` below). Each thumb is a fixed-size
+ * square, swipeable on touch.
+ *
+ * Desktop (>= 1024px): the panel pivots to a right-side column and the
+ * strip flows vertically so thumbs stack into a scrollable column.
+ */
+.galleryStrip {
+  display: flex;
+  flex-direction: row;
+  gap: 0.4rem;
   min-height: 0;
-  overflow-y: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
   scrollbar-width: thin;
   scrollbar-color: rgba(167, 139, 250, 0.35) transparent;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 0.25rem;
 }
 
-@media (min-width: 768px) {
-  .galleryGrid {
-    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
-  }
+.galleryStrip::-webkit-scrollbar {
+  height: 5px;
+  width: 5px;
 }
 
-.galleryGridImage {
-  width: 100%;
+.galleryStrip::-webkit-scrollbar-thumb {
+  background: rgba(167, 139, 250, 0.35);
+  border-radius: 3px;
+}
+
+.galleryStripImage {
+  flex: 0 0 auto;
+  width: clamp(120px, 32vw, 160px);
   aspect-ratio: 1;
   object-fit: cover;
-  border-radius: 0.3rem;
+  border-radius: 0.4rem;
   background: #111;
   display: block;
   border: 1px solid rgba(167, 139, 250, 0.18);
+  scroll-snap-align: start;
 }
 
 .caption {
@@ -476,5 +521,27 @@
   .thumbLabel {
     -webkit-line-clamp: 3;
     flex: 1 1 auto;
+  }
+
+  /* Gallery panel pivots to a right-side column on desktop. */
+  .galleryPanel {
+    top: 0.6rem;
+    right: 0.6rem;
+    bottom: 0.6rem;
+    left: auto;
+    width: clamp(260px, 24vw, 340px);
+  }
+
+  .galleryPanel .galleryStrip {
+    flex-direction: column;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scroll-snap-type: y mandatory;
+    padding-bottom: 0;
+    padding-right: 0.25rem;
+  }
+
+  .galleryPanel .galleryStripImage {
+    width: 100%;
   }
 }

@@ -9,6 +9,7 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 1rem 1.1rem;
+  padding-right: 2.75rem; /* room for collapse button */
   border-radius: 12px;
   background: rgba(10, 10, 10, 0.55);
   backdrop-filter: blur(14px);
@@ -22,10 +23,89 @@
 @media (min-width: 768px) {
   .overlay {
     padding: 1.75rem 2rem;
+    padding-right: 3.5rem;
     gap: 1rem;
     max-height: none;
     overflow-y: visible;
   }
+}
+
+.collapseBtn {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-text);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.collapseBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.collapseBtn:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.expandBtn {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+  min-height: 44px;
+  max-width: min(640px, 92%);
+  padding: 0.65rem 1rem;
+  font: inherit;
+  text-align: left;
+  color: var(--color-text);
+  background: rgba(10, 10, 10, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+/* The <Title> renders an <h1> with its own large size. Inside the collapsed
+   button we want it visible but compact — let the heading style itself,
+   we just shrink the spacing. */
+.expandTitle {
+  display: block;
+}
+
+.expandTitle :global(h1) {
+  margin: 0;
+  font-size: clamp(0.95rem, 0.85rem + 0.6vw, 1.2rem);
+  line-height: 1.2;
+}
+
+.expandHint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.expandBtn:hover {
+  background: rgba(20, 20, 20, 0.8);
+}
+
+.expandBtn:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
 }
 
 /* Position variants. The wrapper is a flex container that fills the slide. */
@@ -37,34 +117,69 @@
   pointer-events: none;
 }
 
-.wrap[data-position='center'] {
-  align-items: center;
-  justify-content: center;
-  text-align: center;
+/* Reserve space at the top of the slide for the floating menu button on
+   mobile (top: ~1rem + 44px button). Below 1024px every overlay is anchored
+   to the top (mobile-first) so the slide title sits beneath the hamburger
+   without overlap. The button is hidden at >= 1024px, so on desktop we only
+   bump padding for the genuinely top-aligned variants. */
+.wrap {
+  padding-top: max(clamp(1rem, 3vw, 3rem), 4.25rem);
 }
 
-.wrap[data-position='top'] {
+@media (min-width: 1024px) {
+  .wrap {
+    padding-top: clamp(1rem, 3vw, 3rem);
+  }
+
+  .wrap[data-position='top'],
+  .wrap[data-position='top-left'],
+  .wrap[data-position='top-right'] {
+    padding-top: clamp(1rem, 3vw, 3rem);
+  }
+}
+
+/* Mobile-first: anchor every overlay to the top so the slide title is
+   visible first. Desktop position variants below override this at >= 768px. */
+.wrap {
   align-items: flex-start;
   justify-content: center;
-  text-align: center;
+  text-align: left;
 }
 
-.wrap[data-position='bottom-left'] {
-  align-items: flex-end;
-  justify-content: flex-start;
-}
+@media (min-width: 768px) {
+  .wrap[data-position='center'] {
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
 
-.wrap[data-position='bottom-right'] {
-  align-items: flex-end;
-  justify-content: flex-end;
-}
+  .wrap[data-position='top'] {
+    align-items: flex-start;
+    justify-content: center;
+    text-align: center;
+  }
 
-.wrap[data-position='top-left'] {
-  align-items: flex-start;
-  justify-content: flex-start;
-}
+  .wrap[data-position='bottom-left'] {
+    align-items: flex-end;
+    justify-content: flex-start;
+    text-align: left;
+  }
 
-.wrap[data-position='top-right'] {
-  align-items: flex-start;
-  justify-content: flex-end;
+  .wrap[data-position='bottom-right'] {
+    align-items: flex-end;
+    justify-content: flex-end;
+    text-align: left;
+  }
+
+  .wrap[data-position='top-left'] {
+    align-items: flex-start;
+    justify-content: flex-start;
+    text-align: left;
+  }
+
+  .wrap[data-position='top-right'] {
+    align-items: flex-start;
+    justify-content: flex-end;
+    text-align: left;
+  }
 }

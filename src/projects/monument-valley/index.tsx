@@ -767,11 +767,16 @@ function pruneOrphanTopStairs(
   }
 }
 
+// Shade-coupled bias for any stacked-cube pass (the original "top" pass and
+// every additional storey above it). A stack-cube tile may sit on a `prev`
+// cell only if their shades match; over a non-block prev cell, only
+// `empty-top` is permitted.
 function makeStackWfc(
-  // Shade-coupled bias for any stacked-cube pass (the original "top" pass and
-  // every additional storey above it). A stack-cube tile may sit on a `prev`
-  // cell only if their shades match; over a non-block prev cell, only
-  // `empty-top` is permitted.
+  W: number,
+  catalog: readonly TileVariant[],
+  layerIdx: LayerIndices,
+  prev: readonly number[],
+): Wfc2D {
   const baseBias = buildCellBias(W, W, catalog, layerIdx.top, layerIdx.emptyTop);
   const STACK_IDS = new Set<string>(['top-cube-coral', 'top-cube-lavender']);
   const STAIR_IDS = new Set<string>(['top-stairs-high', 'top-stairs-low', 'top-ramp']);

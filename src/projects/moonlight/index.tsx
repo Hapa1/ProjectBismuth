@@ -7,8 +7,6 @@ import crystalVert from './shaders/crystal.vert.glsl?raw';
 import crystalFrag from './shaders/crystal.frag.glsl?raw';
 import skyVert from './shaders/sky.vert.glsl?raw';
 import skyFrag from './shaders/sky.frag.glsl?raw';
-import type { AudioBands } from '../../lib/useAudioAnalyser';
-import { useAudioController } from '../../state/AudioProvider';
 
 interface Controls {
   count: number;
@@ -21,8 +19,6 @@ interface Controls {
   cameraDrift: number;
   fogDensity: number;
   moonHeight: number;
-  audioGain: number;
-  smoothing: number;
 }
 
 interface Palette {
@@ -75,16 +71,13 @@ const DEFAULT_CONTROLS: Controls = {
   cameraDrift: 0.4,
   fogDensity: 0.05,
   moonHeight: 0.65,
-  audioGain: 0.9,
-  smoothing: 0.82,
 };
 
 interface SceneProps {
   controls: Controls;
-  bandsRef: React.MutableRefObject<AudioBands>;
 }
 
-function Scene({ controls, bandsRef }: SceneProps) {
+function Scene({ controls }: SceneProps) {
   const { scene } = useThree();
   const palette = PALETTES[controls.paletteIndex] ?? PALETTES[0];
 
@@ -99,11 +92,11 @@ function Scene({ controls, bandsRef }: SceneProps) {
 
   return (
     <>
-      <Sky controls={controls} palette={palette} bandsRef={bandsRef} />
-      <Crystals controls={controls} palette={palette} bandsRef={bandsRef} />
+      <Sky controls={controls} palette={palette} />
+      <Crystals controls={controls} palette={palette} />
       <Ground palette={palette} />
-      <Moon controls={controls} palette={palette} bandsRef={bandsRef} />
-      <CameraRig drift={controls.cameraDrift} bandsRef={bandsRef} />
+      <Moon controls={controls} palette={palette} />
+      <CameraRig drift={controls.cameraDrift} />
     </>
   );
 }
@@ -111,10 +104,9 @@ function Scene({ controls, bandsRef }: SceneProps) {
 interface SkyProps {
   controls: Controls;
   palette: Palette;
-  bandsRef: React.MutableRefObject<AudioBands>;
 }
 
-function Sky({ controls, palette, bandsRef }: SkyProps) {
+function Sky({ controls, palette }: SkyProps) {
   const material = useMemo(
     () =>
       new THREE.ShaderMaterial({
@@ -152,13 +144,7 @@ function Sky({ controls, palette, bandsRef }: SkyProps) {
   useEffect(() => () => material.dispose(), [material]);
 
   useFrame((_, delta) => {
-    const u = material.uniforms;
-    u.uTime.value += delta;
-    const b = bandsRef.current;
-    u.uBass.value = b.bass;
-    u.uMid.value = b.mid;
-    u.uTreble.value = b.treble;
-    u.uLevel.value = b.level;
+    material.uniforms.uTime.value += delta;
   });
 
   return (
@@ -172,7 +158,6 @@ function Sky({ controls, palette, bandsRef }: SkyProps) {
 interface CrystalsProps {
   controls: Controls;
   palette: Palette;
-  bandsRef: React.MutableRefObject<AudioBands>;
 }
 
 // Threshold (relative to spread) at which crystals switch to the low-res LOD.
@@ -263,7 +248,7 @@ function buildCrystalGeometry(highRes: boolean): THREE.BufferGeometry {
   return geo;
 }
 
-function Crystals({ controls, palette, bandsRef }: CrystalsProps) {
+function Crystals({ controls, palette }: CrystalsProps) {
   const nearRef = useRef<THREE.InstancedMesh>(null!);
   const farRef = useRef<THREE.InstancedMesh>(null!);
 
@@ -386,13 +371,7 @@ function Crystals({ controls, palette, bandsRef }: CrystalsProps) {
   }, [geometryNear, geometryFar, material]);
 
   useFrame((_, delta) => {
-    const u = material.uniforms;
-    u.uTime.value += delta;
-    const b = bandsRef.current;
-    u.uBass.value = b.bass;
-    u.uMid.value = b.mid;
-    u.uTreble.value = b.treble;
-    u.uLevel.value = b.level;
+    material.uniforms.uTime.value += delta;
   });
 
   return (
@@ -436,11 +415,9 @@ function Ground({ palette }: GroundProps) {
 interface MoonProps {
   controls: Controls;
   palette: Palette;
-  bandsRef: React.MutableRefObject<AudioBands>;
 }
 
-function Moon({ controls, palette, bandsRef }: MoonProps) {
-  const meshRef = useRef<THREE.Mesh>(null!);
+function Moon({ controls, palette }: MoonProps) {
   const material = useMemo(
     () =>
       new THREE.MeshBasicMaterial({
@@ -453,18 +430,11 @@ function Moon({ controls, palette, bandsRef }: MoonProps) {
 
   useEffect(() => () => material.dispose(), [material]);
 
-  useFrame(() => {
-    const mesh = meshRef.current;
-    if (!mesh) return;
-    const pulse = 1 + bandsRef.current.bass * 0.18;
-    mesh.scale.setScalar(pulse);
-  });
-
   const distance = 38;
   const y = 6 + controls.moonHeight * 14;
 
   return (
-    <mesh ref={meshRef} position={[6, y, -distance]}>
+    <mesh position={[6, y, -distance]}>
       <sphereGeometry args={[3.4, 48, 48]} />
       <primitive object={material} attach="material" />
     </mesh>
@@ -473,10 +443,9 @@ function Moon({ controls, palette, bandsRef }: MoonProps) {
 
 interface CameraRigProps {
   drift: number;
-  bandsRef: React.MutableRefObject<AudioBands>;
 }
 
-function CameraRig({ drift, bandsRef }: CameraRigProps) {
+function CameraRig({ drift }: CameraRigProps) {
   const { camera } = useThree();
   const t = useRef(0);
 
@@ -484,11 +453,10 @@ function CameraRig({ drift, bandsRef }: CameraRigProps) {
     t.current += delta * (0.15 + drift * 0.4);
     const radius = 14 + Math.sin(t.current * 0.7) * 2;
     const angle = t.current * 0.25;
-    const bass = bandsRef.current.bass;
     camera.position.x = Math.sin(angle) * radius;
     camera.position.z = Math.cos(angle) * radius;
-    camera.position.y = 7.5 + Math.sin(t.current * 0.5) * 0.8 + bass * 0.5;
-    camera.lookAt(0, 2.6 + bass * 0.4, 0);
+    camera.position.y = 7.5 + Math.sin(t.current * 0.5) * 0.8;
+    camera.lookAt(0, 2.6, 0);
   });
 
   return null;
@@ -511,43 +479,6 @@ function mulberry32(seed: number): () => number {
 
 function Moonlight({ width, height }: ProjectComponentProps) {
   const [controls, setControls] = useState<Controls>(DEFAULT_CONTROLS);
-  const audio = useAudioController();
-
-  // Auto-start the silent demo synth so the visualizer reacts on mount.
-  // The synth feeds the analyser tap only — no audible output.
-  useEffect(() => {
-    void audio.loadDemo();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  const meterRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    audio.setGain(controls.audioGain);
-  }, [audio, controls.audioGain]);
-
-  useEffect(() => {
-    audio.setSmoothing(controls.smoothing);
-  }, [audio, controls.smoothing]);
-
-  // Update meter bars without re-rendering React
-  useEffect(() => {
-    let raf = 0;
-    const tick = () => {
-      const root = meterRef.current;
-      if (root) {
-        const b = audio.bands.current;
-        const bars = root.querySelectorAll<HTMLElement>(`.${styles.meterFill}`);
-        const values = [b.bass, b.mid, b.treble, b.level];
-        bars.forEach((bar, i) => {
-          bar.style.width = `${Math.min(100, values[i] * 130)}%`;
-        });
-      }
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [audio.bands]);
-
 
   return (
     <div className={styles.root} style={{ width, height }}>
@@ -557,88 +488,15 @@ function Moonlight({ width, height }: ProjectComponentProps) {
           dpr={[1, Math.min(window.devicePixelRatio, 2)]}
           camera={{ fov: 55, position: [0, 8, 14], near: 0.1, far: 200 }}
         >
-          <Scene controls={controls} bandsRef={audio.bands} />
+          <Scene controls={controls} />
         </Canvas>
       </div>
 
       <aside className={styles.panel} aria-label="Moonlight controls">
         <h3 className={styles.panelTitle}>Moonlight</h3>
         <p className={styles.subtitle}>
-          Pick an audio source and tune the crystal field.
+          Tune the crystal field.
         </p>
-
-        <section className={styles.section}>
-          <p className={styles.sectionTitle}>Audio Source</p>
-          <div className={styles.audioGrid}>
-            <button
-              type="button"
-              className={`${styles.button} ${audio.source === 'mic' ? styles.buttonActive : ''}`}
-              onClick={() => void audio.enableMic()}
-            >
-              Microphone
-            </button>
-            <button
-              type="button"
-              className={`${styles.button} ${audio.source === 'tab' ? styles.buttonActive : ''}`}
-              onClick={() => {
-                audio.captureTab().catch((err: unknown) => {
-                  const message = err instanceof Error ? err.message : String(err);
-                  // eslint-disable-next-line no-alert
-                  window.alert(`Tab audio capture failed:\n\n${message}`);
-                });
-              }}
-              title="Pick another tab (e.g. Spotify Web, YouTube) and tick 'Share tab audio'"
-            >
-              Tab Audio
-            </button>
-            <button
-              type="button"
-              className={styles.button}
-              onClick={() => audio.stop()}
-              disabled={!audio.isActive}
-            >
-              Stop
-            </button>
-          </div>
-          <div className={styles.meters} ref={meterRef}>
-            {(['BASS', 'MID', 'TREBLE', 'LEVEL'] as const).map((m) => (
-              <div key={m} className={styles.meter}>
-                <span className={styles.meterLabel}>{m}</span>
-                <span className={styles.meterBar}>
-                  <span className={styles.meterFill} />
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <section className={styles.section}>
-          <p className={styles.sectionTitle}>Audio Mix</p>
-          <Slider
-            label="Audio Gain"
-            min={0}
-            max={1.5}
-            step={0.01}
-            value={controls.audioGain}
-            onChange={(v) => setControls((p) => ({ ...p, audioGain: v }))}
-          />
-          <Slider
-            label="Smoothing"
-            min={0}
-            max={0.96}
-            step={0.01}
-            value={controls.smoothing}
-            onChange={(v) => setControls((p) => ({ ...p, smoothing: v }))}
-          />
-          <Slider
-            label="Reactivity"
-            min={0}
-            max={2}
-            step={0.05}
-            value={controls.reactivity}
-            onChange={(v) => setControls((p) => ({ ...p, reactivity: v }))}
-          />
-        </section>
 
         <section className={styles.section}>
           <p className={styles.sectionTitle}>Crystal Field</p>

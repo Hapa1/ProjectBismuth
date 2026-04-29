@@ -39,6 +39,12 @@ interface UIState {
    * explicitly this session. Used when navigating to a /projects/* route.
    */
   autoExpandProjectsNav: () => void;
+  /**
+   * Optional randomize callback registered by the active project. When set,
+   * the shell renders a stage-level FAB. Cleared on project unmount.
+   */
+  randomizeAction: (() => void) | null;
+  setRandomizeAction: (fn: (() => void) | null) => void;
 }
 
 export const useUIStore = create<UIState>((set, get) => ({
@@ -67,4 +73,6 @@ export const useUIStore = create<UIState>((set, get) => ({
     writeSession(PROJECTS_NAV_KEY, true);
     set({ projectsNavExpanded: true });
   },
+  randomizeAction: null,
+  setRandomizeAction: (fn) => set({ randomizeAction: fn }),
 }));

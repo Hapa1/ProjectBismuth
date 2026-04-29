@@ -1,0 +1,89 @@
+.fab {
+  position: absolute;
+  bottom: 1.75rem;
+  right: 1.75rem;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(167, 139, 250, 0.18);
+  border: 1px solid rgba(167, 139, 250, 0.45);
+  color: var(--color-accent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 0 18px rgba(167, 139, 250, 0.25);
+  transition: transform 160ms ease, background 160ms ease, box-shadow 160ms ease;
+  z-index: 3;
+}
+
+@media (min-width: 768px) {
+  .fab {
+    bottom: 2.25rem;
+    right: 2.25rem;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .fab:hover {
+    background: rgba(167, 139, 250, 0.28);
+    box-shadow:
+      0 10px 28px rgba(0, 0, 0, 0.5),
+      0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+      0 0 26px rgba(167, 139, 250, 0.45);
+    transform: translateY(-1px);
+  }
+}
+
+.fab:active {
+  transform: translateY(0) scale(0.96);
+}
+
+.icon {
+  width: 24px;
+  height: 24px;
+  display: block;
+}
+
+/* Subtle ambient pulse so the FAB reads as inviting / "fun". */
+.fab::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  opacity: 0;
+  animation: fab-pulse 2.6s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes fab-pulse {
+  0% {
+    opacity: 0.55;
+    transform: scale(0.85);
+  }
+  70% {
+    opacity: 0;
+    transform: scale(1.25);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.25);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fab,
+  .fab:active {
+    transition: none;
+    transform: none;
+  }
+  .fab::after {
+    animation: none;
+    display: none;
+  }
+}

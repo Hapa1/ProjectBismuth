@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type P5 from 'p5';
 import type { ProjectComponentProps } from '../../types/project';
 import styles from './GeometryBeneath.module.css';
+import { useRandomize } from '../../lib/useRandomize';
 
 type Mode = 'branching' | 'spiral' | 'tiling' | 'mandelbrot';
 
@@ -995,6 +996,8 @@ function GeometryBeneath({ width, height }: ProjectComponentProps) {
       return next;
     });
   }, []);
+
+  useRandomize(randomize);
 
   const reset = useCallback(() => {
     setControls((prev) => ({ ...DEFAULTS, mode: prev.mode }));

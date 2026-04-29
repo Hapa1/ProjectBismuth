@@ -3,6 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import type { ComponentType } from 'react';
 import type { ProjectComponentProps } from '../types/project';
 import { StageLoader } from './StageLoader';
+import { RandomizeFab } from './RandomizeFab';
 import styles from './RenderStage.module.css';
 
 interface RenderStageProps {
@@ -66,6 +67,7 @@ export function RenderStage({ projectId, ProjectComponent }: RenderStageProps) {
           )}
         </motion.div>
       </AnimatePresence>
+      <RandomizeFab />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import type { ProjectComponentProps } from '../../types/project';
 import styles from './Prismata.module.css';
 import { useAudioAnalyser, type AudioBands } from '../../lib/useAudioAnalyser';
+import { useRandomize } from '../../lib/useRandomize';
 import {
   IridescentSolid,
   useIridescentMaterial,
@@ -360,6 +361,12 @@ function Slider({ label, min, max, step, value, onChange, format }: SliderProps)
 function Prismata({ width, height }: ProjectComponentProps) {
   const reduceMotion = usePrefersReducedMotion();
   const [controls, setControls] = useState<Controls>(DEFAULTS);
+
+  const reshuffle = useCallback(
+    () => setControls((c) => ({ ...c, seed: Math.floor(Math.random() * 9999) })),
+    [],
+  );
+  useRandomize(reshuffle);
   const audio = useAudioAnalyser();
 
   // Auto-start the silent demo synth so the visualizer reacts on mount.
@@ -608,9 +615,7 @@ function Prismata({ width, height }: ProjectComponentProps) {
           <button
             type="button"
             className={styles.button}
-            onClick={() =>
-              setControls((c) => ({ ...c, seed: Math.floor(Math.random() * 9999) }))
-            }
+            onClick={reshuffle}
           >
             Reshuffle
           </button>

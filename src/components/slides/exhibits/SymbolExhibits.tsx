@@ -163,7 +163,9 @@ export function SymbolExhibits() {
               )}
 
               {showImage && (active.image || active.gallery || active.excerpt) && (
-                <figure className={styles.imageOverlay}>
+                <figure
+                  className={`${styles.imageOverlay} ${active.gallery ? styles.galleryPanel : ''}`}
+                >
                   <button
                     type="button"
                     className={styles.closeButton}
@@ -175,14 +177,14 @@ export function SymbolExhibits() {
                   </button>
                   {active.gallery ? (
                     <div
-                      className={styles.galleryGrid}
+                      className={styles.galleryStrip}
                       role="group"
                       aria-label={`${active.label} — ${active.gallery.length} images`}
                     >
                       {active.gallery.map((item) => (
                         <img
                           key={item.src}
-                          className={styles.galleryGridImage}
+                          className={styles.galleryStripImage}
                           src={item.src}
                           alt={item.alt}
                           loading="lazy"

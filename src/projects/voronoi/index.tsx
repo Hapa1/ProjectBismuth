@@ -6,6 +6,7 @@ import type { ProjectComponentProps } from '../../types/project';
 import styles from './Voronoi.module.css';
 import type { AudioBands } from '../../lib/useAudioAnalyser';
 import { useAudioController } from '../../state/AudioProvider';
+import { useRandomize } from '../../lib/useRandomize';
 
 import voronoiVert from './shaders/voronoi.vert.glsl?raw';
 import voronoiFrag from './shaders/voronoi.frag.glsl?raw';
@@ -441,6 +442,7 @@ function Voronoi({ width, height }: ProjectComponentProps) {
 
   const reseed = () =>
     setControls((c) => ({ ...c, seed: Math.floor(Math.random() * 9999) }));
+  useRandomize(reseed);
 
   return (
     <div className={styles.root} style={{ width, height }}>
