@@ -150,7 +150,7 @@ interface Controls {
 }
 
 const DEFAULTS: Controls = {
-  mode: 'tiling',
+  mode: 'mandelbrot',
   iridescent: true,
   gradient: 'iridescent',
   gradientCoeffs: GRADIENT_PRESETS.iridescent.coeffs,

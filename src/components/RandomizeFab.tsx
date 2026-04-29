@@ -36,14 +36,14 @@ export function RandomizeFab() {
         animate={prefersReducedMotion ? undefined : { rotate: 0, scale: 1 }}
         transition={{ type: 'spring', stiffness: 380, damping: 14 }}
       >
-        <SparklesIcon />
+        <DiceIcon />
       </motion.span>
     </motion.button>
   );
 }
 
-function SparklesIcon() {
-  // Sparkles / wand: a large 4-point star with two smaller accents.
+function DiceIcon() {
+  // Die showing the "5" face: rounded square with five pips.
   return (
     <svg
       viewBox="0 0 24 24"
@@ -56,12 +56,12 @@ function SparklesIcon() {
       focusable="false"
       style={{ width: '100%', height: '100%' }}
     >
-      {/* Main star */}
-      <path d="M12 3.5 L13.6 9.4 L19.5 11 L13.6 12.6 L12 18.5 L10.4 12.6 L4.5 11 L10.4 9.4 Z" fill="currentColor" fillOpacity="0.18" />
-      {/* Top-right accent */}
-      <path d="M18.5 4 L19.1 5.9 L21 6.5 L19.1 7.1 L18.5 9 L17.9 7.1 L16 6.5 L17.9 5.9 Z" fill="currentColor" fillOpacity="0.35" />
-      {/* Bottom-left accent */}
-      <path d="M5.5 16 L6 17.5 L7.5 18 L6 18.5 L5.5 20 L5 18.5 L3.5 18 L5 17.5 Z" fill="currentColor" fillOpacity="0.35" />
+      <rect x="3.5" y="3.5" width="17" height="17" rx="3.5" fill="currentColor" fillOpacity="0.18" />
+      <circle cx="8" cy="8" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="16" cy="8" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="8" cy="16" r="1.4" fill="currentColor" stroke="none" />
+      <circle cx="16" cy="16" r="1.4" fill="currentColor" stroke="none" />
     </svg>
   );
 }

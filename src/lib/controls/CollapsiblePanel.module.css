@@ -1,36 +1,76 @@
 /* Floating settings/gear toggle button rendered when the controls panel
-   is collapsed. Sits in the same corner the panel would occupy so opening
-   the panel visually replaces it. */
+   is collapsed. On mobile it's a prominent pill anchored bottom-center so
+   it sits just above the slideshow's back/forward nav. On desktop it
+   shrinks back to a compact gear button in the top-right corner. */
 .toggle {
   position: absolute;
-  top: 0.6rem;
-  right: 0.6rem;
-  width: 44px;
-  height: 44px;
+  left: 50%;
+  bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  min-height: 48px;
+  padding: 0 1.1rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.5rem;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: rgba(10, 10, 10, 0.7);
+  border: 1px solid rgba(167, 139, 250, 0.55);
+  background: rgba(20, 18, 32, 0.88);
   color: var(--color-text);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   cursor: pointer;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(167, 139, 250, 0.15);
   z-index: 30;
   pointer-events: auto;
 }
 
+.toggleIcon {
+  flex-shrink: 0;
+}
+
+.toggleLabel {
+  white-space: nowrap;
+}
+
 @media (hover: hover) and (pointer: fine) {
   .toggle:hover {
-    background: rgba(20, 20, 20, 0.85);
+    background: rgba(35, 30, 55, 0.95);
+    border-color: rgba(167, 139, 250, 0.8);
   }
 }
 
 .toggle:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
+}
+
+@media (min-width: 1024px) {
+  .toggle {
+    left: auto;
+    bottom: auto;
+    transform: none;
+    top: 0.6rem;
+    right: 0.6rem;
+    width: 44px;
+    min-height: 0;
+    height: 44px;
+    padding: 0;
+    border-radius: 999px;
+    text-transform: none;
+    border-color: rgba(255, 255, 255, 0.16);
+    background: rgba(10, 10, 10, 0.7);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  }
+
+  .toggleLabel {
+    display: none;
+  }
 }
 
 /* Close button placed inside the panel so the user can dismiss it. The
