@@ -4,6 +4,7 @@ import { OrbitControls } from '@react-three/drei';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import type { ProjectComponentProps } from '../../types/project';
+import { CollapsiblePanel } from '../../lib/controls';
 import styles from './Prismata.module.css';
 import { useAudioAnalyser, type AudioBands } from '../../lib/useAudioAnalyser';
 import { useRandomize } from '../../lib/useRandomize';
@@ -448,7 +449,7 @@ function Prismata({ width, height }: ProjectComponentProps) {
       </Canvas>
 
       {showControlsPanel && (
-        <aside className={styles.panel} aria-label="Prismata controls">
+        <CollapsiblePanel className={styles.panel} ariaLabel="Prismata controls">
         <h3 className={styles.panelTitle}>Prismata · Audio Crystals</h3>
         <p className={styles.subtitle}>
           Recursive cloud of orbiting iridescent crystals — orbit count, kind,
@@ -620,7 +621,7 @@ function Prismata({ width, height }: ProjectComponentProps) {
             Reshuffle
           </button>
         </section>
-        </aside>
+        </CollapsiblePanel>
       )}
     </div>
   );

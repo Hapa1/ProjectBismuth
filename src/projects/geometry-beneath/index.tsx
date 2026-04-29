@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type P5 from 'p5';
 import type { ProjectComponentProps } from '../../types/project';
+import { CollapsiblePanel } from '../../lib/controls';
 import styles from './GeometryBeneath.module.css';
 import { useRandomize } from '../../lib/useRandomize';
 
@@ -1029,7 +1030,7 @@ function GeometryBeneath({ width, height }: ProjectComponentProps) {
         />
       </div>
 
-      <aside className={styles.panel} aria-label="Geometry Beneath Everything controls">
+      <CollapsiblePanel className={styles.panel} ariaLabel="Geometry Beneath Everything controls">
         <h3 className={styles.panelTitle}>The Geometry Beneath Everything</h3>
         <p className={styles.tagline}>{TAGLINES[controls.mode]}</p>
 
@@ -1374,7 +1375,7 @@ function GeometryBeneath({ width, height }: ProjectComponentProps) {
             </button>
           </div>
         </section>
-      </aside>
+      </CollapsiblePanel>
     </div>
   );
 }

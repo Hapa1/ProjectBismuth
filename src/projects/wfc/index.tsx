@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type P5 from 'p5';
 import type { ProjectComponentProps } from '../../types/project';
+import { CollapsiblePanel } from '../../lib/controls';
 import styles from './WFC.module.css';
 
 type TilesetName = 'pipes' | 'circuit' | 'terrain';
@@ -810,7 +811,7 @@ function WFCProject({ width, height }: ProjectComponentProps) {
     <div className={styles.root}>
       <div ref={hostRef} className={styles.canvasHost} />
 
-      <aside className={styles.panel} aria-label="Wave Function Collapse controls">
+      <CollapsiblePanel className={styles.panel} ariaLabel="Wave Function Collapse controls">
         <h3 className={styles.panelTitle}>Wave Function Collapse</h3>
 
         <section className={styles.section}>
@@ -889,7 +890,7 @@ function WFCProject({ width, height }: ProjectComponentProps) {
             </button>
           </div>
         </section>
-      </aside>
+      </CollapsiblePanel>
     </div>
   );
 }

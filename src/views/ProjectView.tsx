@@ -53,7 +53,9 @@ export function ProjectView() {
       <ExhibitInfoModal
         open={infoOpen}
         onClose={() => setInfoOpen(false)}
-        meta={entry.meta}
+        id={entry.meta.id}
+        title={entry.meta.title}
+        subtitleParts={[entry.meta.renderer, String(entry.meta.year), entry.meta.id]}
         info={exhibitInfo[projectId]}
       />
     </div>

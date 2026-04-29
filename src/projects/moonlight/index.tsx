@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { ProjectComponentProps } from '../../types/project';
+import { CollapsiblePanel } from '../../lib/controls';
 import styles from './Moonlight.module.css';
 import crystalVert from './shaders/crystal.vert.glsl?raw';
 import crystalFrag from './shaders/crystal.frag.glsl?raw';
@@ -492,7 +493,7 @@ function Moonlight({ width, height }: ProjectComponentProps) {
         </Canvas>
       </div>
 
-      <aside className={styles.panel} aria-label="Moonlight controls">
+      <CollapsiblePanel className={styles.panel} ariaLabel="Moonlight controls">
         <h3 className={styles.panelTitle}>Moonlight</h3>
         <p className={styles.subtitle}>
           Tune the crystal field.
@@ -585,7 +586,7 @@ function Moonlight({ width, height }: ProjectComponentProps) {
             ))}
           </div>
         </section>
-      </aside>
+      </CollapsiblePanel>
     </div>
   );
 }

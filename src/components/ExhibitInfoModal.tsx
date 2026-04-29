@@ -1,21 +1,27 @@
 import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import type { ExhibitInfo, ProjectMeta } from '../types/project';
+import type { ExhibitInfo } from '../types/project';
 import styles from './ExhibitInfoModal.module.css';
 
 interface Props {
   open: boolean;
   onClose: () => void;
-  meta: ProjectMeta;
+  /** Stable id used for aria-labelledby. */
+  id: string;
+  /** Heading text — project or slide title. */
+  title: string;
+  /** Caps row under the title; falsy entries are skipped. */
+  subtitleParts?: Array<string | undefined | null | false>;
   info: ExhibitInfo | undefined;
 }
 
 /**
- * Renders an exhibit's significance / science / practice content in an
+ * Renders long-form context (significance / science / practice) in an
  * accessible modal dialog. Portaled to <body>, focus-trapped, Esc-closable,
- * backdrop-closable. Used by [../views/ProjectView.tsx](../views/ProjectView.tsx).
+ * backdrop-closable. Used by both [../views/ProjectView.tsx](../views/ProjectView.tsx)
+ * and [../views/SlideshowView.tsx](../views/SlideshowView.tsx).
  */
-export function ExhibitInfoModal({ open, onClose, meta, info }: Props) {
+export function ExhibitInfoModal({ open, onClose, id, title, subtitleParts, info }: Props) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
@@ -68,7 +74,8 @@ export function ExhibitInfoModal({ open, onClose, meta, info }: Props) {
 
   if (!open) return null;
 
-  const titleId = `exhibit-info-title-${meta.id}`;
+  const titleId = `exhibit-info-title-${id}`;
+  const parts = (subtitleParts ?? []).filter((p): p is string => Boolean(p));
 
   return createPortal(
     <div
@@ -86,14 +93,17 @@ export function ExhibitInfoModal({ open, onClose, meta, info }: Props) {
       >
         <header className={styles.header}>
           <div className={styles.titleBlock}>
-            <h2 id={titleId} className={styles.title}>{meta.title}</h2>
-            <p className={styles.subtitle}>
-              <span>{meta.renderer}</span>
-              <span aria-hidden="true">·</span>
-              <span>{meta.year}</span>
-              <span aria-hidden="true">·</span>
-              <span>{meta.id}</span>
-            </p>
+            <h2 id={titleId} className={styles.title}>{title}</h2>
+            {parts.length > 0 && (
+              <p className={styles.subtitle}>
+                {parts.map((p, i) => (
+                  <span key={i}>
+                    {i > 0 && <span aria-hidden="true" className={styles.subtitleSep}>·</span>}
+                    <span>{p}</span>
+                  </span>
+                ))}
+              </p>
+            )}
           </div>
           <button
             ref={closeBtnRef}

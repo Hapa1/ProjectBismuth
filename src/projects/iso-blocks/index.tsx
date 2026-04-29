@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type P5 from 'p5';
 import type { ProjectComponentProps } from '../../types/project';
+import { CollapsiblePanel } from '../../lib/controls';
 import styles from './IsoBlocks.module.css';
 import { Wfc3D } from './wfc3d';
 import { BLOCKS, type BlockId } from './tiles';
@@ -406,7 +407,7 @@ function IsoBlocksProject({ width, height }: ProjectComponentProps) {
     <div className={styles.root}>
       <div ref={hostRef} className={styles.canvasHost} />
 
-      <aside className={styles.panel} aria-label="Isometric WFC controls">
+      <CollapsiblePanel className={styles.panel} ariaLabel="Isometric WFC controls">
         <h3 className={styles.panelTitle}>Iso Blocks · WFC</h3>
 
         <section className={styles.section}>
@@ -472,7 +473,7 @@ function IsoBlocksProject({ width, height }: ProjectComponentProps) {
             </button>
           </div>
         </section>
-      </aside>
+      </CollapsiblePanel>
     </div>
   );
 }

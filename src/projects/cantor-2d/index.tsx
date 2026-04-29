@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type P5 from 'p5';
 import type { ProjectComponentProps } from '../../types/project';
+import { CollapsiblePanel } from '../../lib/controls';
 import styles from './Cantor2D.module.css';
 
 interface Controls {
@@ -227,7 +228,7 @@ function Cantor2D({ width, height }: ProjectComponentProps) {
     <div className={styles.root}>
       <div ref={hostRef} className={styles.canvasHost} />
 
-      <aside className={styles.panel} aria-label="Cantor 2D controls">
+      <CollapsiblePanel className={styles.panel} ariaLabel="Cantor 2D controls">
         <h3 className={styles.panelTitle}>Cantor Set (2D)</h3>
         <p className={styles.tagline}>
           Click or enable auto-animate to see the fractal fold and unfold. Each line removes its
@@ -286,7 +287,7 @@ function Cantor2D({ width, height }: ProjectComponentProps) {
             </button>
           </div>
         </section>
-      </aside>
+      </CollapsiblePanel>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { OrbitControls } from '@react-three/drei';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import type { ProjectComponentProps } from '../../types/project';
-import { Slider } from '../../lib/controls';
+import { Slider, CollapsiblePanel } from '../../lib/controls';
 import styles from './Gargantua.module.css';
 import bhVert from './shaders/blackhole.vert.glsl?raw';
 import bhFrag from './shaders/blackhole.frag.glsl?raw';
@@ -259,7 +259,7 @@ function ControlPanel({ controls, setControls }: PanelProps) {
     setControls((c) => ({ ...c, [key]: v }));
 
   return (
-    <aside className={styles.panel} aria-label="Gargantua controls">
+    <CollapsiblePanel className={styles.panel} ariaLabel="Gargantua controls">
       <h3 className={styles.panelTitle}>Gargantua · Black Hole</h3>
       <p className={styles.subtitle}>Raymarched · drag to orbit · zoom with wheel</p>
 
@@ -312,7 +312,7 @@ function ControlPanel({ controls, setControls }: PanelProps) {
           />
         </div>
       </section>
-    </aside>
+    </CollapsiblePanel>
   );
 }
 

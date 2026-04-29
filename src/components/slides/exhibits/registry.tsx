@@ -30,6 +30,20 @@ export const EXHIBITS: ExhibitDef[] = [
     id: 'golden-ratio',
     label: 'Golden Ratio — φ ≈ 1.6180339887',
     imageAlt: 'Nested squares scaling by the golden ratio with the golden spiral.',
+    gallery: [
+      {
+        src: '/slides/symbols/golden-nautilus.jpg',
+        alt: 'Cutaway of a nautilus shell showing a logarithmic spiral.',
+      },
+      {
+        src: '/slides/symbols/golden-sunflower.jpg',
+        alt: 'Sunflower seed head with golden-angle phyllotaxis spirals.',
+      },
+      {
+        src: '/slides/symbols/golden-galaxy.jpg',
+        alt: 'Barred spiral galaxy NGC 1300 imaged by Hubble.',
+      },
+    ],
     excerpt: [
       'φ is the unique positive number where 1 + 1/φ = φ. Solve x² = x + 1 and you get φ = (1 + √5) / 2.',
       'Each square in the construction is φ times larger than the one before. The spiral is built from quarter-circle arcs inside each square — an approximation of a true logarithmic spiral whose growth factor is φ per quarter turn.',

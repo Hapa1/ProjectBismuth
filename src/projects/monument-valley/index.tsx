@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type P5 from 'p5';
 import type { Image as P5Image } from 'p5';
 import type { ProjectComponentProps } from '../../types/project';
+import { CollapsiblePanel } from '../../lib/controls';
 import styles from './MonumentValley.module.css';
 import {
   BASE_TILES,
@@ -574,7 +575,7 @@ function MonumentValleyProject({ width, height }: ProjectComponentProps) {
     <div className={styles.root}>
       <div ref={hostRef} className={styles.canvasHost} />
 
-      <aside className={styles.panel} aria-label="Monument Valley controls">
+      <CollapsiblePanel className={styles.panel} ariaLabel="Monument Valley controls">
         <h3 className={styles.panelTitle}>Monument Valley · WFC</h3>
 
         <section className={styles.section}>
@@ -632,7 +633,7 @@ function MonumentValleyProject({ width, height }: ProjectComponentProps) {
             </span>
           </div>
         </section>
-      </aside>
+      </CollapsiblePanel>
     </div>
   );
 }

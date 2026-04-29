@@ -34,8 +34,8 @@ void main() {
   vec3 iridColor = cosineSpectrum(rim * 1.1 + hueShift, vec3(0.55, 0.88, 1.22));
 
   // Body colour — iridescent rim dominates, with a faint inner mid-band wash.
-  vec3 rimColor = iridColor * (1.6 + uLevel * 1.4) * rim;
-  vec3 innerWash = vec3(0.18, 0.42, 0.95) * uMid * 0.6 * facing;
+  vec3 rimColor = iridColor * (1.1 + uLevel * 1.0) * rim;
+  vec3 innerWash = vec3(0.18, 0.42, 0.95) * uMid * 0.45 * facing;
 
   vec3 col = rimColor + innerWash;
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, Suspense, useMemo } from 'react';
 import { lazyComponentFor } from '../../projects/projectRegistry';
 import { StageLoader } from '../StageLoader';
+import { RandomizeFab } from '../RandomizeFab';
 import { useSlideContext } from './SlideContext';
 import styles from './SlideDemo.module.css';
 
@@ -72,6 +73,7 @@ export function SlideDemo({ projectId, unmountWhenInactive = true, scrim = true 
         </Suspense>
       )}
       {scrim && <div className={styles.scrim} aria-hidden="true" />}
+      {shouldMount && isActive && <RandomizeFab />}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { ProjectComponentProps } from '../../types/project';
+import { CollapsiblePanel } from '../../lib/controls';
 import styles from './Sierpinski3D.module.css';
 
 interface Controls {
@@ -221,7 +222,7 @@ function Sierpinski3D({ }: ProjectComponentProps) {
         </Canvas>
       </div>
 
-      <aside className={styles.panel} aria-label="Sierpinski 3D controls">
+      <CollapsiblePanel className={styles.panel} ariaLabel="Sierpinski 3D controls">
         <h3 className={styles.panelTitle}>Sierpinski Tetrahedron</h3>
         <p className={styles.tagline}>
           A fractal where each tetrahedron spawns four smaller copies. Self-similar at every scale.
@@ -292,7 +293,7 @@ function Sierpinski3D({ }: ProjectComponentProps) {
             </button>
           </div>
         </section>
-      </aside>
+      </CollapsiblePanel>
     </div>
   );
 }

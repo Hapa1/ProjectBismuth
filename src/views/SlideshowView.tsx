@@ -12,8 +12,10 @@ import { useReducedMotion } from 'framer-motion';
 import { slideRegistry as defaultSlideRegistry } from '../slides/registry';
 import type { SlideRegistryEntry } from '../slides/types';
 import { slideMdxComponents } from '../slides/mdxComponents';
+import { slideInfo } from '../slides/slideInfo';
 import { SlideShell } from '../components/slides/SlideShell';
 import { StageLoader } from '../components/StageLoader';
+import { ExhibitInfoModal } from '../components/ExhibitInfoModal';
 import { useUIStore } from '../state/uiStore';
 import styles from './SlideshowView.module.css';
 
@@ -31,6 +33,7 @@ export function SlideshowView({ registry = defaultSlideRegistry }: SlideshowView
   const observerRef = useRef<IntersectionObserver | null>(null);
   const visibilityRef = useRef(new Map<string, number>());
   const [activeId, setActiveId] = useState<string>(registry[0]?.meta.id ?? '');
+  const [infoOpen, setInfoOpen] = useState(false);
 
   // Lazy components, memoized by registry identity so identity is stable
   // for as long as the registry reference is stable.
@@ -287,8 +290,19 @@ export function SlideshowView({ registry = defaultSlideRegistry }: SlideshowView
                     </svg>
                   </button>
                   <div className={styles.navLabel}>
-                    <span className={styles.navTitle} title={activeTitle}>
-                      {activeTitle}
+                    <span className={styles.navTitleRow}>
+                      <span className={styles.navTitle} title={activeTitle}>
+                        {activeTitle}
+                      </span>
+                      <button
+                        type="button"
+                        className={styles.navInfoBtn}
+                        onClick={() => setInfoOpen(true)}
+                        aria-label={`About ${activeTitle}`}
+                        aria-haspopup="dialog"
+                      >
+                        ?
+                      </button>
                     </span>
                     <span className={styles.navCounter} aria-label={`Slide ${idx + 1} of ${slides.length}`}>
                       {idx + 1} / {slides.length}
@@ -318,6 +332,21 @@ export function SlideshowView({ registry = defaultSlideRegistry }: SlideshowView
           );
         })()}
       </div>
+
+      {(() => {
+        const active = slides.find((s) => s.meta.id === activeId);
+        if (!active) return null;
+        return (
+          <ExhibitInfoModal
+            open={infoOpen}
+            onClose={() => setInfoOpen(false)}
+            id={active.meta.id}
+            title={active.meta.title}
+            subtitleParts={['slide', active.meta.id]}
+            info={slideInfo[active.meta.id]}
+          />
+        );
+      })()}
     </MDXProvider>
   );
 }

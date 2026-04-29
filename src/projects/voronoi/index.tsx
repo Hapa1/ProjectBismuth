@@ -3,6 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import type { ProjectComponentProps } from '../../types/project';
+import { CollapsiblePanel } from '../../lib/controls';
 import styles from './Voronoi.module.css';
 import type { AudioBands } from '../../lib/useAudioAnalyser';
 import { useAudioController } from '../../state/AudioProvider';
@@ -477,7 +478,7 @@ function Voronoi({ width, height }: ProjectComponentProps) {
         </EffectComposer>
       </Canvas>
 
-      <aside className={styles.panel} aria-label="Voronoi controls">
+      <CollapsiblePanel className={styles.panel} ariaLabel="Voronoi controls">
         <h3 className={styles.panelTitle}>Voronoi · Beat Cells</h3>
         <p className={styles.subtitle}>
           Seeded voronoi tessellation with per-cell parallax. Hover to light edges with
@@ -646,7 +647,7 @@ function Voronoi({ width, height }: ProjectComponentProps) {
             onChange={(v) => setControls((c) => ({ ...c, bloomIntensity: v }))}
           />
         </section>
-      </aside>
+      </CollapsiblePanel>
     </div>
   );
 }

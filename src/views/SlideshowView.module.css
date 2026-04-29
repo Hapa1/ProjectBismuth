@@ -162,6 +162,58 @@
   letter-spacing: 0.01em;
 }
 
+.navTitleRow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.navInfoBtn {
+  position: relative;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  min-height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: transparent;
+  color: var(--color-muted, #9a9a9a);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+/* Expand the touch target without growing the visible circle. */
+.navInfoBtn::before {
+  content: '';
+  position: absolute;
+  inset: -11px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .navInfoBtn:hover {
+    color: var(--color-text);
+    border-color: var(--color-accent);
+    background: rgba(167, 139, 250, 0.1);
+  }
+}
+
+.navInfoBtn:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
 .navCounter {
   font-family: var(--font-mono, ui-monospace, monospace);
   font-size: 0.6875rem;

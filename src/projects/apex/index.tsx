@@ -3,6 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import type { ProjectComponentProps } from '../../types/project';
+import { CollapsiblePanel } from '../../lib/controls';
 import type { AudioBands } from '../../lib/useAudioAnalyser';
 import { useAudioController } from '../../state/AudioProvider';
 import styles from './Apex.module.css';
@@ -574,7 +575,7 @@ function Apex({ width, height }: ProjectComponentProps) {
         </EffectComposer>
       </Canvas>
 
-      <aside className={styles.panel} aria-label="Apex controls">
+      <CollapsiblePanel className={styles.panel} ariaLabel="Apex controls">
         <h3 className={styles.panelTitle}>Apex · Inverted Pyramid</h3>
         <p className={styles.subtitle}>
           {controls.mode === 'mirage'
@@ -773,7 +774,7 @@ function Apex({ width, height }: ProjectComponentProps) {
             onChange={(v) => setControls((c) => ({ ...c, bloomIntensity: v }))}
           />
         </section>
-      </aside>
+      </CollapsiblePanel>
     </div>
   );
 }

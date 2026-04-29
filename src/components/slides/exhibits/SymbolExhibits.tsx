@@ -92,7 +92,9 @@ export function SymbolExhibits() {
     <div className={styles.root}>
       <header className={styles.header}>
         <span className={styles.eyebrow}>Slide 2 · Intro to Sacred Geometry</span>
-        <h2 className={styles.title}>The same shapes, drawn by people who never met</h2>
+        <h2 className={styles.title}>
+          Shapes used by ancient Greeks, Tibetan Buddhists, Neolithic Irish, Gothic French, and Islamic Persians
+        </h2>
       </header>
 
       <div className={styles.layout}>

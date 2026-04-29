@@ -11,12 +11,28 @@
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: #f3eee8;
+  /* Cap the chat screenshot so the overlay never grows past the wrap's top
+     padding. Without this the panel collides with the top of the viewport. */
+  max-height: 32vh;
 }
 
 .image {
   display: block;
   width: 100%;
-  height: auto;
+  height: 100%;
+  max-height: 32vh;
+  object-fit: contain;
+  object-position: top center;
+}
+
+@media (min-width: 1024px) {
+  .imageFrame {
+    max-height: 28vh;
+  }
+
+  .image {
+    max-height: 28vh;
+  }
 }
 
 .prompts {

@@ -3,6 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import * as THREE from 'three';
 import type { ProjectComponentProps } from '../../types/project';
+import { CollapsiblePanel } from '../../lib/controls';
 import styles from './Lattice.module.css';
 import type { AudioBands } from '../../lib/useAudioAnalyser';
 import { useAudioController } from '../../state/AudioProvider';
@@ -741,7 +742,7 @@ function Lattice({ width, height }: ProjectComponentProps) {
         </EffectComposer>
       </Canvas>
 
-      <aside className={styles.panel} aria-label="Lattice controls">
+      <CollapsiblePanel className={styles.panel} ariaLabel="Lattice controls">
         <h3 className={styles.panelTitle}>Lattice · Beat Glow</h3>
         <p className={styles.subtitle}>
           A grid that lights only where it&rsquo;s touched. Hover to paint with the cursor;
@@ -902,7 +903,7 @@ function Lattice({ width, height }: ProjectComponentProps) {
             onChange={(v) => setControls((c) => ({ ...c, bloomIntensity: v }))}
           />
         </section>
-      </aside>
+      </CollapsiblePanel>
     </div>
   );
 }

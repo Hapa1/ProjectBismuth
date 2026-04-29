@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type P5 from 'p5';
 import type { ProjectComponentProps } from '../../types/project';
+import { CollapsiblePanel } from '../../lib/controls';
 import styles from './Expanse.module.css';
 import { useRandomize } from '../../lib/useRandomize';
 
@@ -146,7 +147,7 @@ function ExpanseAnimated({ width, height }: ProjectComponentProps) {
     <div className={styles.root}>
       <div ref={hostRef} className={styles.canvasHost} />
 
-      <aside className={styles.panel} aria-label="Expanse controls">
+      <CollapsiblePanel className={styles.panel} ariaLabel="Expanse controls">
         <h3 className={styles.panelTitle}>Slant Settings</h3>
 
         <section className={styles.section}>
@@ -344,7 +345,7 @@ function ExpanseAnimated({ width, height }: ProjectComponentProps) {
             onChange={(value) => setControls((prev) => ({ ...prev, contrastLevels: value }))}
           />
         </section>
-      </aside>
+      </CollapsiblePanel>
     </div>
   );
 }
