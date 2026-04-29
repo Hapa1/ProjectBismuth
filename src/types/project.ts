@@ -19,3 +19,19 @@ export interface ProjectComponentProps {
   width: number;
   height: number;
 }
+
+/**
+ * Long-form context for an exhibit, surfaced via the "?" info modal in the
+ * project header. Each section is plain text; paragraphs are separated by
+ * blank lines and rendered as <p> elements.
+ */
+export interface ExhibitInfo {
+  /** Why the exhibit matters — cultural, artistic, historical framing. */
+  significance: string;
+  /** The math, science, or algorithm under the hood. */
+  science: string;
+  /** Where you encounter this in the wild — practical & applied uses. */
+  practice: string;
+  /** Optional further reading. URLs only when verifiable & canonical. */
+  references?: { label: string; url: string }[];
+}

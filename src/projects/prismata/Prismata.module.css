@@ -144,3 +144,15 @@
     max-height: none;
   }
 }
+
+/* Inside a slide demo on small screens, the slide overlay already explains
+ * what's happening — hide the controls panel so the visual is visible. */
+:global([data-slide-demo='true']) .panel {
+  display: none;
+}
+
+@media (min-width: 768px) {
+  :global([data-slide-demo='true']) .panel {
+    display: block;
+  }
+}

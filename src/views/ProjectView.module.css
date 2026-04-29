@@ -31,6 +31,8 @@
   font-size: 0.75rem;
   color: var(--color-text-muted);
   text-transform: lowercase;
+  flex: 1;
+  min-width: 0;
 }
 
 .breadcrumbLink {
@@ -43,4 +45,49 @@
 
 .sep {
   opacity: 0.4;
+}
+
+.title {
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.infoBtn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 0.25rem;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1;
+  /* Expand the touch target to 44x44 without growing the visual circle. */
+  position: relative;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+}
+
+.infoBtn::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .infoBtn:hover {
+    color: var(--color-text);
+    border-color: var(--color-accent);
+    background: rgba(167, 139, 250, 0.08);
+  }
 }

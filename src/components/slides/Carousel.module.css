@@ -25,6 +25,9 @@
   /* Center and fit to number of cards */
   width: max-content;
   max-width: calc(100% - 1rem);
+  /* Cap height on mobile so the expanded carousel never buries the demo
+   * entirely. The shell handles its own internal scroll. */
+  max-height: 55dvh;
   margin: 0 auto;
 }
 
@@ -32,6 +35,9 @@
   .wrap {
     right: var(--carousel-right-inset, 0px);
     padding: clamp(0.5rem, 1.5vw, 0.75rem);
+    /* Restore unconstrained height on tablet/desktop where the carousel sits
+     * alongside the demo rather than over it. */
+    max-height: none;
   }
 }
 
@@ -85,6 +91,7 @@
   color: var(--color-text);
 
   height: auto;
+  max-height: 100%;
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -327,9 +334,15 @@
 
 .mediaEmbed {
   aspect-ratio: auto;
-  height: 300px;
+  height: 220px;
   background: #fff;
   border-color: rgba(255, 255, 255, 0.1);
+}
+
+@media (min-width: 768px) {
+  .mediaEmbed {
+    height: 300px;
+  }
 }
 
 .embed {

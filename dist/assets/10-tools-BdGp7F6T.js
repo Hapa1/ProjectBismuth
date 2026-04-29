@@ -1,0 +1,5 @@
+import{u as a,j as e}from"./index-DMYix05E.js";const x={id:"v2-tools",title:"Tools"};function l(o){const t={p:"p",...a(),...o.components},{Body:r,Demo:s,Eyebrow:i,Overlay:c,Title:d}=t;return r||n("Body"),s||n("Demo"),i||n("Eyebrow"),c||n("Overlay"),d||n("Title"),e.jsxs(e.Fragment,{children:[e.jsx(s,{projectId:"apex"}),`
+`,e.jsxs(c,{position:"bottom-right",children:[e.jsx(i,{children:"Tools"}),e.jsx(d,{children:"Where to start"}),e.jsx(r,{children:e.jsxs(t.p,{children:[e.jsx("strong",{children:"Beginner:"}),` p5.js, Processing, TouchDesigner, Hydra,\r
+Three.js, Blender + Python, ShaderToy / GLSL, Sonic Pi, TidalCycles.`]})}),e.jsx(r,{children:e.jsxs(t.p,{children:[e.jsx("strong",{children:"AI-assisted:"}),` ChatGPT, GitHub Copilot, Cursor, VS Code\r
+with AI. Pair them with the tools above and the gap between idea and\r
+working sketch closes fast.`]})})]})]})}function p(o={}){const{wrapper:t}={...a(),...o.components};return t?e.jsx(t,{...o,children:e.jsx(l,{...o})}):l(o)}function n(o,t){throw new Error("Expected component `"+o+"` to be defined: you likely forgot to import, pass, or provide it.")}export{p as default,x as meta};

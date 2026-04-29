@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import * as THREE from 'three';
 import { IridescentLine } from '../../../../lib/iridescent';
 import { useExhibitMaterial } from '../useExhibitMaterial';
@@ -7,29 +7,17 @@ import { ExhibitFrame } from './ExhibitFrame';
 
 const PHI = (1 + Math.sqrt(5)) / 2;
 
-interface ArcDef {
-  cx: number;
-  cy: number;
-  radius: number;
-  startAngle: number;
-}
-
-interface RectDef {
-  cx: number;
-  cy: number;
-  size: number;
-}
-
 /**
- * Golden Ratio — nested φ-rectangles with a stepped golden spiral built
- * from a chain of small rotated boxes (matches the bismuth/blocky aesthetic).
+ * Golden Spiral — nested golden-ratio squares with a smooth quarter-circle
+ * spiral connecting them, approximating the logarithmic golden spiral
+ * r(θ) = a · φ^(2θ/π).
  *
- * Construction:
- *  - Place a unit square, rotate 90° each step, scale by φ.
- *  - Spiral arcs are quarter-circles centered on the corner opposite to the
- *    next square's direction, with radius equal to the square's side.
- *  - Sample the arcs and place flat box meshes at each sample, oriented to
- *    the local tangent. Boxes share one geometry + one material.
+ * Arc i has centre C_i, radius r_i = φ^i, and sweeps π/2 CCW from θ_i.
+ * The recurrence that keeps consecutive arcs endpoint-continuous:
+ *   C_{i+1} = C_i + r_i · (1 − φ) · (cos(θ_i + π/2), sin(θ_i + π/2))
+ *
+ * Each arc's centre is a corner of its square, so the four square corners
+ * fall out directly from the arc geometry — no separate rect-centre tracking.
  */
 export function GoldenRatioScene({ params }: SceneProps) {
   const iterations = Math.max(2, Math.round(params.iterations ?? 7));
@@ -42,137 +30,114 @@ export function GoldenRatioScene({ params }: SceneProps) {
     pointerRadius: 2.4,
   });
 
-  const { rects, boxes } = useMemo(() => {
-    const rectDefs: RectDef[] = [];
-    const arcDefs: ArcDef[] = [];
-
-    let size = 1;
+  const { squareLines, spiralPoints } = useMemo(() => {
+    // --- Arc centres via the endpoint-continuity recurrence -----------
+    const THETA_0 = 0; // first arc: east → north CCW
+    const arcCx: number[] = [];
+    const arcCy: number[] = [];
     let cx = 0;
     let cy = 0;
-    const dirs: Array<[number, number]> = [
-      [1, 0],
-      [0, 1],
-      [-1, 0],
-      [0, -1],
-    ];
-
     for (let i = 0; i < iterations; i += 1) {
-      const dir = dirs[i % 4];
-      rectDefs.push({ cx, cy, size });
-
-      arcDefs.push({
-        cx: cx - (dir[0] * size) / 2,
-        cy: cy - (dir[1] * size) / 2,
-        radius: size,
-        startAngle: (i % 4) * (Math.PI / 2) + Math.PI,
-      });
-
-      const next = size * PHI;
-      cx += (dir[0] * (size + next)) / 2;
-      cy += (dir[1] * (size + next)) / 2;
-      size = next;
+      arcCx.push(cx);
+      arcCy.push(cy);
+      const r = Math.pow(PHI, i);
+      const nextTheta = THETA_0 + i * (Math.PI / 2) + Math.PI / 2;
+      cx += r * (1 - PHI) * Math.cos(nextTheta);
+      cy += r * (1 - PHI) * Math.sin(nextTheta);
     }
 
-    // Tight bbox including arc extents.
+    // --- Tight bounding box from all square corners ------------------
     let minX = Infinity;
     let minY = Infinity;
     let maxX = -Infinity;
     let maxY = -Infinity;
-    for (const r of rectDefs) {
-      minX = Math.min(minX, r.cx - r.size / 2);
-      minY = Math.min(minY, r.cy - r.size / 2);
-      maxX = Math.max(maxX, r.cx + r.size / 2);
-      maxY = Math.max(maxY, r.cy + r.size / 2);
-    }
-    for (const a of arcDefs) {
-      const samples = 8;
-      for (let s = 0; s <= samples; s += 1) {
-        const t = a.startAngle + (s / samples) * (Math.PI / 2);
-        const x = a.cx + Math.cos(t) * a.radius;
-        const y = a.cy + Math.sin(t) * a.radius;
-        minX = Math.min(minX, x);
-        minY = Math.min(minY, y);
-        maxX = Math.max(maxX, x);
-        maxY = Math.max(maxY, y);
-      }
+    const expand = (x: number, y: number) => {
+      if (x < minX) minX = x;
+      if (y < minY) minY = y;
+      if (x > maxX) maxX = x;
+      if (y > maxY) maxY = y;
+    };
+    for (let i = 0; i < iterations; i += 1) {
+      const r = Math.pow(PHI, i);
+      const theta = THETA_0 + i * (Math.PI / 2);
+      const acx = arcCx[i];
+      const acy = arcCy[i];
+      const cosT = Math.cos(theta);
+      const sinT = Math.sin(theta);
+      const cosT2 = Math.cos(theta + Math.PI / 2);
+      const sinT2 = Math.sin(theta + Math.PI / 2);
+      // All four corners of the square.
+      expand(acx, acy);
+      expand(acx + r * cosT, acy + r * sinT);
+      expand(acx + r * cosT2, acy + r * sinT2);
+      expand(acx + r * cosT + r * cosT2, acy + r * sinT + r * sinT2);
     }
     const ox = (minX + maxX) / 2;
     const oy = (minY + maxY) / 2;
     const span = Math.max(maxX - minX, maxY - minY);
     const fit = 2.6 / span;
 
-    const rects: { points: THREE.Vector3[] }[] = rectDefs.map((r) => {
-      const half = r.size / 2;
-      const x = (r.cx - ox) * fit;
-      const y = (r.cy - oy) * fit;
-      const h = half * fit;
-      return {
-        points: [
-          new THREE.Vector3(x - h, y - h, 0),
-          new THREE.Vector3(x + h, y - h, 0),
-          new THREE.Vector3(x + h, y + h, 0),
-          new THREE.Vector3(x - h, y + h, 0),
-          new THREE.Vector3(x - h, y - h, 0),
-        ],
-      };
-    });
+    const v = (x: number, y: number) =>
+      new THREE.Vector3((x - ox) * fit, (y - oy) * fit, 0);
 
-    // Boxes along the spiral. Step count scales with each arc's radius so
-    // small inner arcs still get a few boxes and the tail gets a long chain.
-    type BoxInst = {
-      pos: [number, number, number];
-      rot: [number, number, number];
-      size: [number, number, number];
-    };
-    const boxes: BoxInst[] = [];
-    const boxThickness = thickness * fit * 0.9;
-    arcDefs.forEach((a) => {
-      const arcLen = (Math.PI / 2) * a.radius * fit;
-      const stepLen = boxThickness * 1.4;
-      const n = Math.max(4, Math.round(arcLen / stepLen));
-      for (let s = 0; s < n; s += 1) {
-        const t = a.startAngle + ((s + 0.5) / n) * (Math.PI / 2);
-        const x = (a.cx + Math.cos(t) * a.radius - ox) * fit;
-        const y = (a.cy + Math.sin(t) * a.radius - oy) * fit;
-        // Tangent direction = perpendicular to radial, sweeping CCW.
-        const tangent = t + Math.PI / 2;
-        const segLen = (Math.PI / 2) * a.radius * fit / n + boxThickness * 0.4;
-        boxes.push({
-          pos: [x, y, 0],
-          rot: [0, 0, tangent],
-          size: [segLen, boxThickness, boxThickness],
-        });
+    // --- Square outlines: one closed loop per square -----------------
+    const squareLines: { points: THREE.Vector3[] }[] = [];
+    for (let i = 0; i < iterations; i += 1) {
+      const r = Math.pow(PHI, i);
+      const theta = THETA_0 + i * (Math.PI / 2);
+      const acx = arcCx[i];
+      const acy = arcCy[i];
+      const cosT = Math.cos(theta);
+      const sinT = Math.sin(theta);
+      const cosT2 = Math.cos(theta + Math.PI / 2);
+      const sinT2 = Math.sin(theta + Math.PI / 2);
+      // A = arc centre (corner), B = arc start, D = arc end, C = opposite corner.
+      const A = v(acx, acy);
+      const B = v(acx + r * cosT, acy + r * sinT);
+      const C = v(acx + r * cosT + r * cosT2, acy + r * sinT + r * sinT2);
+      const D = v(acx + r * cosT2, acy + r * sinT2);
+      squareLines.push({ points: [A, B, C, D, A] });
+    }
+
+    // --- Spiral: continuous polyline through all quarter-circle arcs --
+    const spiralPoints: THREE.Vector3[] = [];
+    for (let i = 0; i < iterations; i += 1) {
+      const r = Math.pow(PHI, i);
+      const theta = THETA_0 + i * (Math.PI / 2);
+      const acx = arcCx[i];
+      const acy = arcCy[i];
+      // Scale sample density with arc length so larger arcs stay smooth.
+      const arcLen = (Math.PI / 2) * r * fit;
+      const n = Math.max(8, Math.round(arcLen * 24));
+      const endS = i === iterations - 1 ? n : n - 1; // avoid duplicate junction points
+      for (let s = 0; s <= endS; s += 1) {
+        const t = theta + (s / n) * (Math.PI / 2);
+        spiralPoints.push(v(acx + Math.cos(t) * r, acy + Math.sin(t) * r));
       }
-    });
+    }
 
-    return { rects, boxes };
-  }, [iterations, thickness]);
-
-  // One shared box geometry — meshes are scaled per-instance.
-  const boxGeometry = useMemo(() => new THREE.BoxGeometry(1, 1, 1), []);
-  useEffect(() => () => boxGeometry.dispose(), [boxGeometry]);
+    return { squareLines, spiralPoints };
+  }, [iterations]);
 
   return (
     <ExhibitFrame>
-      {rects.map((r, i) => (
+      {squareLines.map((sq, i) => (
         <IridescentLine
-          key={i}
-          points={r.points}
-          width={thickness * 0.45}
-          radialSegments={10}
+          key={`sq-${i}`}
+          points={sq.points}
+          width={thickness * 0.35}
+          radialSegments={8}
           material={material}
         />
       ))}
-      {boxes.map((b, i) => (
-        <mesh
-          key={i}
-          geometry={boxGeometry}
+      {spiralPoints.length >= 2 && (
+        <IridescentLine
+          points={spiralPoints}
+          width={thickness * 0.9}
+          radialSegments={12}
           material={material}
-          position={b.pos}
-          rotation={b.rot}
-          scale={b.size}
         />
-      ))}
+      )}
     </ExhibitFrame>
   );
 }

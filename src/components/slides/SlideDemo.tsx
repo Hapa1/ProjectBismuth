@@ -63,7 +63,10 @@ export function SlideDemo({ projectId, unmountWhenInactive = true, scrim = true 
     <div className={styles.bg} ref={bindContainer}>
       {shouldMount && size.width > 0 && size.height > 0 && (
         <Suspense fallback={<StageLoader />}>
-          <div className={`${styles.fade} ${isActive ? styles.fadeIn : ''}`}>
+          <div
+            className={`${styles.fade} ${isActive ? styles.fadeIn : ''}`}
+            data-slide-demo="true"
+          >
             <ProjectComponent width={size.width} height={size.height} />
           </div>
         </Suspense>

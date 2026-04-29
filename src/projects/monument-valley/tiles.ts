@@ -58,6 +58,9 @@ export type BaseTileId =
   | 'empty-top'
   | 'top-cube-coral'
   | 'top-cube-lavender'
+  | 'top-stairs-high'
+  | 'top-stairs-low'
+  | 'top-ramp'
   | 'empty-crown'
   | 'crown-tower';
 
@@ -275,6 +278,37 @@ export const BASE_TILES: readonly BaseTile[] = [
   // Arch is a doorway — disabled per user request (no doorways on the second
   // level). Keep the slot blank.
 
+  // Climbing stairs/ramps on cube roofs. Reuse the mid stair sprites so a
+  // staircase visually rises off a cube's roof toward the next storey. They
+  // never support stacking themselves (isBlock=false), so the crown / further
+  // stack passes will skip the cell above them.
+  {
+    id: 'top-stairs-high',
+    layer: 'top',
+    symmetry: 'X',
+    sourceIndex: 10,
+    sockets: ['stair-high', 'air', 'stair-low', 'air'],
+    weight: 0.7,
+    stairs: { lowDir: 2 },
+  },
+  {
+    id: 'top-stairs-low',
+    layer: 'top',
+    symmetry: 'X',
+    sourceIndex: 12,
+    sockets: ['stair-high', 'air', 'stair-low', 'air'],
+    weight: 0.7,
+    stairs: { lowDir: 2 },
+  },
+  {
+    id: 'top-ramp',
+    layer: 'top',
+    symmetry: 'X',
+    sourceIndex: 13,
+    sockets: ['stair-high', 'air', 'stair-low', 'air'],
+    weight: 0.55,
+    stairs: { lowDir: 2 },
+  },
   // ─── CROWN LAYER (towers, only over an isBlock top cell) ───────────────
   {
     id: 'empty-crown',

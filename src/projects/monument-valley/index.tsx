@@ -129,13 +129,18 @@ function buildCellBias(
           m.set(idx, isEdge ? 0.2 : 1.4);
         } else if (v.baseId === 'column') {
           // Columns are the headline feature on a pillar row, otherwise rare.
-          m.set(idx, isPillarRow ? 12 : 0.08);
+          m.set(idx, isPillarRow ? 14 : 0.08);
         } else if (
           v.baseId === 'temple-balcony' ||
           v.baseId === 'crown-tower'
         ) {
           // Suppress big features in pillar rows so the colonnade stays clean.
-          m.set(idx, isPillarRow ? 0.05 : isEdge ? 0.4 : 1.5);
+          m.set(idx, isPillarRow ? 0 : isEdge ? 0.4 : 1.5);
+        } else if (isPillarRow) {
+          // In a pillar row the only allowed mid-layer tiles are columns and
+          // empty-mid. Force every other variant (cubes, walls, stairs, ramp,
+          // arches) to zero weight so the row reads as a clean colonnade.
+          m.set(idx, 0);
         }
       }
       bias.push(m);
@@ -716,18 +721,60 @@ function createScene(
   };
 }
 
-function makeStackWfc(
+/**
+ * Replace any `top-stairs-high` / `top-stairs-low` cell that has no adjacent
+ * stair (in the same pass) with `empty-top`. Keeps `top-ramp` untouched —
+ * single ramps are a valid feature on a roof. Mutates `collapsed` in place.
+ */
+function pruneOrphanTopStairs(
   W: number,
+  collapsed: number[],
   catalog: readonly TileVariant[],
-  layerIdx: LayerIndices,
-  prev: readonly number[],
-): Wfc2D {
+  emptyTopIdx: number,
+): void {
+  const isStrictStair = (idx: number): boolean => {
+    const v = catalog[idx];
+    return v?.baseId === 'top-stairs-high' || v?.baseId === 'top-stairs-low';
+  };
+  const isAnyStair = (idx: number): boolean => {
+    const v = catalog[idx];
+    return (
+      v?.baseId === 'top-stairs-high' ||
+      v?.baseId === 'top-stairs-low' ||
+      v?.baseId === 'top-ramp'
+    );
+  };
+  for (let y = 0; y < W; y++) {
+    for (let x = 0; x < W; x++) {
+      const i = x + y * W;
+      if (!isStrictStair(collapsed[i])) continue;
+      let hasNeighbour = false;
+      const neighbours: Array<[number, number]> = [
+        [x - 1, y],
+        [x + 1, y],
+        [x, y - 1],
+        [x, y + 1],
+      ];
+      for (const [nx, ny] of neighbours) {
+        if (nx < 0 || ny < 0 || nx >= W || ny >= W) continue;
+        if (isAnyStair(collapsed[nx + ny * W])) {
+          hasNeighbour = true;
+          break;
+        }
+      }
+      if (!hasNeighbour) collapsed[i] = emptyTopIdx;
+    }
+  }
+}
+
+function makeStackWfc(
   // Shade-coupled bias for any stacked-cube pass (the original "top" pass and
   // every additional storey above it). A stack-cube tile may sit on a `prev`
   // cell only if their shades match; over a non-block prev cell, only
   // `empty-top` is permitted.
   const baseBias = buildCellBias(W, W, catalog, layerIdx.top, layerIdx.emptyTop);
   const STACK_IDS = new Set<string>(['top-cube-coral', 'top-cube-lavender']);
+  const STAIR_IDS = new Set<string>(['top-stairs-high', 'top-stairs-low', 'top-ramp']);
   const stackBias: Map<number, number>[] = [];
   for (let y = 0; y < W; y++) {
     for (let x = 0; x < W; x++) {
@@ -735,6 +782,12 @@ function makeStackWfc(
       const prevVariant = catalog[prev[x + y * W]];
       const prevShade = prevVariant.base.shade ?? 'neutral';
       const prevIsBlock = prevVariant.base.isBlock === true;
+      // Climbing stairs read best when the cube to the NORTH (the stair's high
+      // side, since lowDir=2/south) is also a roofed cube — the staircase then
+      // visually climbs onto another cube. Detect that and boost the stair bias.
+      const northIdx = y > 0 ? prev[x + (y - 1) * W] : -1;
+      const northIsBlock =
+        northIdx >= 0 && catalog[northIdx]?.base.isBlock === true;
       for (const idx of layerIdx.top) {
         if (idx === layerIdx.emptyTop) {
           // Down-weight empty over a real block so a stack wins the roll.
@@ -749,6 +802,11 @@ function makeStackWfc(
         }
         if (STACK_IDS.has(v.baseId)) {
           m.set(idx, prevIsBlock ? 6 : 0);
+        } else if (STAIR_IDS.has(v.baseId)) {
+          // Stairs sit on a cube roof. Strongly favoured when the next cube
+          // north exists (a true climb), else mild presence as decoration.
+          if (!prevIsBlock) m.set(idx, 0);
+          else m.set(idx, northIsBlock ? 5 : 1.2);
         }
       }
       stackBias.push(m);
@@ -902,6 +960,7 @@ function advanceScene(
     }
     if (scene.collapsedGround && scene.collapsedMid && scene.collapsedTop) {
       const W2 = scene.top.width;
+      pruneOrphanTopStairs(W2, scene.collapsedTop, catalog, layerIdx.emptyTop);
       if (scene.extraStacks.length > 0) {
         scene.extraStacks[0].wfc = makeStackWfc(W2, catalog, layerIdx, scene.collapsedTop);
         scene.stackIdx = 0;
@@ -926,6 +985,9 @@ function advanceScene(
       return;
     }
     const W2 = pass.wfc.width;
+    if (pass.collapsed) {
+      pruneOrphanTopStairs(W2, pass.collapsed, catalog, layerIdx.emptyTop);
+    }
     if (scene.stackIdx < scene.extraStacks.length - 1) {
       // Build the next stack pass on top of this one.
       scene.stackIdx += 1;

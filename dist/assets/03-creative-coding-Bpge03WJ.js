@@ -1,0 +1,5 @@
+import{u as m,j as e}from"./index-DMYix05E.js";const x={id:"v2-creative-coding",title:"Generative Art in the Wild"};function d(t){const n={p:"p",...m(),...t.components},{ArtistCarousel:o,Body:r,Demo:s,Eyebrow:a,Overlay:c,Title:l}=n;return o||i("ArtistCarousel"),r||i("Body"),s||i("Demo"),a||i("Eyebrow"),c||i("Overlay"),l||i("Title"),e.jsxs(e.Fragment,{children:[e.jsx(s,{projectId:"expanse"}),`
+`,e.jsxs(c,{position:"top-left",children:[e.jsx(a,{children:"Definition"}),e.jsx(l,{children:"Generative Art in the Wild"}),e.jsx(r,{children:e.jsx(n.p,{children:`Writing code where the goal is expression, not just utility. Generative\r
+art, fractals, music visualizers, simulations, shader art, procedural\r
+worlds, sacred geometry, data-driven visuals.`})}),e.jsx(r,{children:e.jsx("em",{children:"The anti AI slop."})})]}),`
+`,e.jsx(o,{rightInset:"calc(min(18.5rem, 36vw) + 1.5rem)"})]})}function p(t={}){const{wrapper:n}={...m(),...t.components};return n?e.jsx(n,{...t,children:e.jsx(d,{...t})}):d(t)}function i(t,n){throw new Error("Expected component `"+t+"` to be defined: you likely forgot to import, pass, or provide it.")}export{p as default,x as meta};

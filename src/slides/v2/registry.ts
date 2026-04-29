@@ -14,12 +14,12 @@ export const presentationV2Registry: SlideRegistryEntry[] = [
     load: () => import('./content/01-title.mdx'),
   },
   {
-    meta: { id: 'v2-big-idea', title: 'Prompted, not Coded' },
-    load: () => import('./content/02-big-idea.mdx'),
+    meta: { id: 'v2-creative-coding', title: 'Generative Art in the Wild' },
+    load: () => import('./content/03-creative-coding.mdx'),
   },
   {
-    meta: { id: 'v2-creative-coding', title: 'What Is Creative Coding?' },
-    load: () => import('./content/03-creative-coding.mdx'),
+    meta: { id: 'v2-big-idea', title: 'Prompted, not Coded' },
+    load: () => import('./content/02-big-idea.mdx'),
   },
   {
     meta: { id: 'v2-fractals', title: 'Fractals' },

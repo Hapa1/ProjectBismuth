@@ -66,7 +66,7 @@ const DEFAULT_CONTROLS: Controls = {
   gamma: 2,
   zoom: 1.55,
   heightRange: 10,
-  slopeRange: 0.2,
+  slopeRange: 0.35,
   noiseMagnitude: 3,
   noiseScale: 0.05,
   rotation: 0,
@@ -246,7 +246,7 @@ function ExpanseAnimated({ width, height }: ProjectComponentProps) {
           <SliderControl
             label="Slope Range"
             min={0}
-            max={0.2}
+            max={0.6}
             step={0.01}
             value={controls.slopeRange}
             onChange={(value) => setControls((prev) => ({ ...prev, slopeRange: value }))}

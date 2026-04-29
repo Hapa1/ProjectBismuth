@@ -1,5 +1,17 @@
-import { useCallback, useRef, useState, useId } from 'react';
+import { useCallback, useEffect, useRef, useState, useId } from 'react';
 import styles from './Carousel.module.css';
+
+/**
+ * Mobile breakpoint matching the rest of the app (spec §6a). Below this we
+ * default the carousel to collapsed so it doesn't bury the demo behind a
+ * 500-px-tall stack of cards on phones.
+ */
+const MOBILE_QUERY = '(max-width: 767px)';
+
+function getInitialCollapsed(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia(MOBILE_QUERY).matches;
+}
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -56,8 +68,28 @@ export function Carousel({
   rightInset,
 }: CarouselProps) {
   const trackRef = useRef<HTMLDivElement | null>(null);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState<boolean>(getInitialCollapsed);
+  const userToggledRef = useRef(false);
   const trackId = useId();
+
+  // Keep collapsed state in sync with viewport size — but only until the user
+  // explicitly opens or closes the panel. After that we respect their choice
+  // even if they resize across the breakpoint.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mql = window.matchMedia(MOBILE_QUERY);
+    const onChange = (e: MediaQueryListEvent) => {
+      if (userToggledRef.current) return;
+      setCollapsed(e.matches);
+    };
+    mql.addEventListener('change', onChange);
+    return () => mql.removeEventListener('change', onChange);
+  }, []);
+
+  const handleToggle = useCallback(() => {
+    userToggledRef.current = true;
+    setCollapsed((v) => !v);
+  }, []);
 
   const scrollByCard = useCallback((direction: 1 | -1) => {
     const el = trackRef.current;
@@ -95,7 +127,7 @@ export function Carousel({
             <button
               type="button"
               className={styles.toggleButton}
-              onClick={() => setCollapsed((v) => !v)}
+              onClick={handleToggle}
               aria-expanded={!collapsed}
               aria-controls={trackId}
               aria-label={collapsed ? 'Show artists' : 'Hide artists'}
