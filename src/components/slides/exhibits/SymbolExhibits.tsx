@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { EXHIBITS } from './registry';
+import { ExhibitSymbol } from './ExhibitSymbol';
 import { Slider } from '../../../lib/controls';
 import { useSlideContext } from '../SlideContext';
 import { SlideDemo } from '../SlideDemo';
@@ -107,13 +108,9 @@ export function SymbolExhibits() {
                     aria-pressed={selected}
                     aria-label={e.label}
                   >
-                    <img
-                      className={styles.thumb}
-                      src={e.image}
-                      alt=""
-                      loading="lazy"
-                      decoding="async"
-                    />
+                    <span className={styles.thumb} aria-hidden="true">
+                      <ExhibitSymbol id={e.id} className={styles.thumbIcon} />
+                    </span>
                     <span className={styles.thumbLabel}>{e.label.split(' — ')[0]}</span>
                   </button>
                 </li>

@@ -130,6 +130,10 @@ interface MandelbrotControls {
   maxIter: number;
   escapeR: number;
   contrast: number;
+  autoZoom: boolean;
+  targetX: number;
+  targetY: number;
+  targetZoom: number;
 }
 
 interface Controls {
@@ -176,6 +180,10 @@ const DEFAULTS: Controls = {
     maxIter: 180,
     escapeR: 4,
     contrast: 1,
+    autoZoom: false,
+    targetX: -0.743643887037151,
+    targetY: 0.13182590420533,
+    targetZoom: 8000,
   },
 };
 
@@ -565,13 +573,13 @@ function drawMandelbrot(
   c: MandelbrotControls,
   iridescent: boolean,
   coeffs: CosineCoeffs,
+  fast: boolean,
 ) {
   p.background(8, 9, 12);
 
-  // Render at full CSS-pixel resolution for crisp detail. Cap the long edge
-  // only on very large viewports to keep CPU work bounded.
+  // Resolution cap: low during animation/interaction, high when idle.
   const maxEdge = Math.max(width, height);
-  const cap = 1600;
+  const cap = fast ? 820 : 1600;
   const scale = maxEdge > cap ? cap / maxEdge : 1;
   const rw = Math.max(2, Math.floor(width * scale));
   const rh = Math.max(2, Math.floor(height * scale));
@@ -588,29 +596,57 @@ function drawMandelbrot(
   const x0 = c.centerX - spanX / 2;
   const y0 = c.centerY - spanY / 2;
 
-  const maxIter = Math.max(20, Math.floor(c.maxIter));
+  const iterBoost = fast ? 0.15 : 0.5;
+  const maxIter = Math.max(
+    20,
+    Math.floor(c.maxIter * (1 + iterBoost * Math.log2(Math.max(1, c.zoom)))),
+  );
   const escapeSq = Math.max(2, c.escapeR) * Math.max(2, c.escapeR);
   const logEscape = Math.log(Math.max(2, c.escapeR));
   const contrast = Math.max(0.2, c.contrast);
 
+  // Faster pixel writes via 32-bit view (little-endian: 0xAABBGGRR).
+  const buf32 = new Uint32Array(data.buffer);
+  const interiorColor = (255 << 24) | (12 << 16) | (7 << 8) | 6;
+
   // 1D cosine palette: color depends purely on smooth iteration count, so
   // bands follow the fractal instead of being smeared across the screen.
   const TAU = Math.PI * 2;
-  const palette1D = (t: number): [number, number, number] => {
+  const palette1D = (t: number): number => {
     const r = coeffs.a[0] + coeffs.b[0] * Math.cos(TAU * (coeffs.c[0] * t + coeffs.d[0]));
     const g = coeffs.a[1] + coeffs.b[1] * Math.cos(TAU * (coeffs.c[1] * t + coeffs.d[1]));
     const b = coeffs.a[2] + coeffs.b[2] * Math.cos(TAU * (coeffs.c[2] * t + coeffs.d[2]));
-    return [
-      Math.round(Math.max(0, Math.min(1, r)) * 255),
-      Math.round(Math.max(0, Math.min(1, g)) * 255),
-      Math.round(Math.max(0, Math.min(1, b)) * 255),
-    ];
+    const R = Math.round(Math.max(0, Math.min(1, r)) * 255);
+    const G = Math.round(Math.max(0, Math.min(1, g)) * 255);
+    const B = Math.round(Math.max(0, Math.min(1, b)) * 255);
+    return (255 << 24) | (B << 16) | (G << 8) | R;
   };
+
+  // Precompute palette LUT (1024 entries) — avoids cosine cost per pixel.
+  const LUT_SIZE = 1024;
+  const lut = new Uint32Array(LUT_SIZE);
+  for (let i = 0; i < LUT_SIZE; i++) lut[i] = palette1D(i / LUT_SIZE);
 
   for (let py = 0; py < rh; py++) {
     const ci = y0 + (py / rh) * spanY;
     for (let px = 0; px < rw; px++) {
       const cr = x0 + (px / rw) * spanX;
+      const idx = py * rw + px;
+
+      // Fast interior tests: main cardioid and period-2 bulb. Points inside
+      // these regions are guaranteed to be in the set, so we skip iteration.
+      const xm = cr - 0.25;
+      const q = xm * xm + ci * ci;
+      if (q * (q + xm) <= 0.25 * ci * ci) {
+        buf32[idx] = interiorColor;
+        continue;
+      }
+      const xp1 = cr + 1;
+      if (xp1 * xp1 + ci * ci <= 0.0625) {
+        buf32[idx] = interiorColor;
+        continue;
+      }
+
       let zr = 0;
       let zi = 0;
       let iter = 0;
@@ -623,32 +659,23 @@ function drawMandelbrot(
         zi2 = zi * zi;
         iter++;
       }
-      const idx = (py * rw + px) * 4;
       if (iter >= maxIter) {
-        data[idx] = 6;
-        data[idx + 1] = 7;
-        data[idx + 2] = 12;
-        data[idx + 3] = 255;
+        buf32[idx] = interiorColor;
       } else {
         // Smooth iteration count (continuous coloring).
         const log_zn = Math.log(zr2 + zi2) * 0.5;
         const nu = Math.log(log_zn / logEscape) / Math.LN2;
-        const smooth = iter + 1 - nu;
-        // sqrt compresses the fast-escape outer band so detail is more even.
-        let t = Math.sqrt(Math.max(0, smooth) / maxIter) * contrast;
-        t = t - Math.floor(t); // wrap into [0,1) for richer banding
+        const smooth = Math.max(0, iter + 1 - nu);
+        // Log-spaced mapping keeps bands evenly spaced even at deep zoom and
+        // avoids the harsh wrap that produced neon noise. The cosine palette
+        // already oscillates, so we just feed it a smooth monotonic value.
+        const t = (Math.log(1 + smooth) / Math.log(1 + maxIter)) * contrast;
+        const tClamped = Math.max(0, Math.min(0.999, t));
         if (iridescent) {
-          const [r, g, b] = palette1D(t);
-          data[idx] = r;
-          data[idx + 1] = g;
-          data[idx + 2] = b;
-          data[idx + 3] = 255;
+          buf32[idx] = lut[(tClamped * LUT_SIZE) | 0];
         } else {
-          const v = Math.round(255 * Math.pow(t, 0.7));
-          data[idx] = v;
-          data[idx + 1] = v;
-          data[idx + 2] = v;
-          data[idx + 3] = 255;
+          const v = Math.round(255 * Math.pow(tClamped, 0.7));
+          buf32[idx] = (255 << 24) | (v << 16) | (v << 8) | v;
         }
       }
     }
@@ -657,7 +684,8 @@ function drawMandelbrot(
 
   const ctx = p.drawingContext as CanvasRenderingContext2D;
   ctx.save();
-  ctx.imageSmoothingEnabled = scale < 1;
+  // Always bilinear-smooth on upscale; keeps the fast pass from looking blocky.
+  ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(buf, 0, 0, width, height);
   ctx.restore();
@@ -703,21 +731,38 @@ function GeometryBeneath({ width, height }: ProjectComponentProps) {
   const [branchStats, setBranchStats] = useState<BranchStats>({ segments: 0, capped: false });
   const lastReportedRef = useRef<BranchStats>({ segments: 0, capped: false });
   const rafRef = useRef(0);
+  const refineTimerRef = useRef<number | null>(null);
+  const fastRef = useRef(false);
+
+  // Schedule a high-quality re-render after the user (or auto-zoom) stops.
+  const scheduleRefine = useCallback((delayMs: number) => {
+    if (refineTimerRef.current !== null) {
+      window.clearTimeout(refineTimerRef.current);
+    }
+    refineTimerRef.current = window.setTimeout(() => {
+      refineTimerRef.current = null;
+      fastRef.current = false;
+      sketchRef.current?.redraw();
+    }, delayMs);
+  }, []);
 
   useEffect(() => {
     controlsRef.current = controls;
+    // Any control change is interactive: render fast first, refine after idle.
+    fastRef.current = true;
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     rafRef.current = requestAnimationFrame(() => {
       rafRef.current = 0;
       sketchRef.current?.redraw();
     });
+    if (!controls.mandelbrot.autoZoom) scheduleRefine(180);
     return () => {
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = 0;
       }
     };
-  }, [controls]);
+  }, [controls, scheduleRefine]);
 
   useEffect(() => {
     sizeRef.current = { width, height };
@@ -756,7 +801,7 @@ function GeometryBeneath({ width, height }: ProjectComponentProps) {
           } else if (c.mode === 'tiling') {
             drawTiling(p, w, h, c.tiling, c.iridescent, c.gradientCoeffs);
           } else {
-            drawMandelbrot(p, w, h, c.mandelbrot, c.iridescent, c.gradientCoeffs);
+            drawMandelbrot(p, w, h, c.mandelbrot, c.iridescent, c.gradientCoeffs, fastRef.current);
           }
         };
       };
@@ -782,6 +827,43 @@ function GeometryBeneath({ width, height }: ProjectComponentProps) {
     instance.redraw();
   }, [width, height]);
 
+  // Auto-zoom: smoothly drive zoom toward targetZoom while easing center
+  // toward (targetX, targetY). Only runs when the toggle is on and we're in
+  // mandelbrot mode. Stops automatically when target zoom is reached.
+  useEffect(() => {
+    if (controls.mode !== 'mandelbrot' || !controls.mandelbrot.autoZoom) return;
+    let raf = 0;
+    let last = performance.now();
+    const step = (now: number) => {
+      const dt = Math.min(0.05, (now - last) / 1000);
+      last = now;
+      setControls((prev) => {
+        if (!prev.mandelbrot.autoZoom) return prev;
+        const m = prev.mandelbrot;
+        // Multiplicative zoom feels constant on a log scale: ~30% per second.
+        const nextZoom = Math.min(m.targetZoom, m.zoom * Math.exp(0.3 * dt));
+        // Ease center toward target proportional to remaining log-zoom.
+        const k = 1 - Math.exp(-1.2 * dt);
+        const cx = m.centerX + (m.targetX - m.centerX) * k;
+        const cy = m.centerY + (m.targetY - m.centerY) * k;
+        const reached = nextZoom >= m.targetZoom - 1e-6;
+        return {
+          ...prev,
+          mandelbrot: {
+            ...m,
+            zoom: nextZoom,
+            centerX: cx,
+            centerY: cy,
+            autoZoom: reached ? false : m.autoZoom,
+          },
+        };
+      });
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [controls.mode, controls.mandelbrot.autoZoom]);
+
   const setMode = useCallback((mode: Mode) => {
     setControls((prev) => ({ ...prev, mode }));
   }, []);
@@ -797,20 +879,25 @@ function GeometryBeneath({ width, height }: ProjectComponentProps) {
       } else if (prev.mode === 'mandelbrot') {
         // Pick a random interesting point near the boundary of the set.
         const POIs: Array<[number, number, number]> = [
-          [-0.743643887037151, 0.131825904205330, 800],
-          [-0.10109636384562, 0.95628651080914, 200],
-          [-1.25066, 0.02012, 200],
-          [-0.7269, 0.1889, 300],
-          [0.28693186889, 0.014286693, 400],
-          [-0.748, 0.1, 80],
-          [-1.7497219, 0, 200],
+          [-0.743643887037151, 0.131825904205330, 8000],
+          [-0.10109636384562, 0.95628651080914, 2000],
+          [-1.25066, 0.02012, 2000],
+          [-0.7269, 0.1889, 3000],
+          [0.28693186889, 0.014286693, 4000],
+          [-0.748, 0.1, 800],
+          [-1.7497219, 0, 2000],
         ];
         const [cx, cy, z] = POIs[Math.floor(Math.random() * POIs.length)];
         next.mandelbrot = {
           ...prev.mandelbrot,
-          centerX: cx,
-          centerY: cy,
-          zoom: z,
+          // If auto-zoom is on, set the target and reset to a wide view to
+          // animate in. Otherwise jump to the POI for instant exploration.
+          targetX: cx,
+          targetY: cy,
+          targetZoom: z,
+          ...(prev.mandelbrot.autoZoom
+            ? { centerX: -0.7, centerY: 0, zoom: 1 }
+            : { centerX: cx, centerY: cy, zoom: z }),
         };
       } else {
         next.spiral = {
@@ -1075,6 +1162,27 @@ function GeometryBeneath({ width, height }: ProjectComponentProps) {
         {controls.mode === 'mandelbrot' && (
           <section className={styles.section}>
             <p className={styles.sectionTitle}>Mandelbrot</p>
+            <label className={styles.toggleRow}>
+              <span className={styles.label}>Auto zoom</span>
+              <input
+                type="checkbox"
+                className={styles.toggle}
+                checked={controls.mandelbrot.autoZoom}
+                onChange={(e) =>
+                  setControls((prev) => ({
+                    ...prev,
+                    mandelbrot: {
+                      ...prev.mandelbrot,
+                      autoZoom: e.target.checked,
+                      // When turning on from idle, restart from a wide view.
+                      ...(e.target.checked && prev.mandelbrot.zoom >= prev.mandelbrot.targetZoom - 1e-6
+                        ? { zoom: 1, centerX: -0.7, centerY: 0 }
+                        : null),
+                    },
+                  }))
+                }
+              />
+            </label>
             <SliderControl
               label="Zoom"
               min={0.5}
@@ -1131,8 +1239,8 @@ function GeometryBeneath({ width, height }: ProjectComponentProps) {
             <SliderControl
               label="Contrast"
               min={0.5}
-              max={6}
-              step={0.1}
+              max={3}
+              step={0.05}
               value={controls.mandelbrot.contrast}
               onChange={(v) =>
                 setControls((p) => ({ ...p, mandelbrot: { ...p.mandelbrot, contrast: v } }))

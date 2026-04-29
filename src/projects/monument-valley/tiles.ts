@@ -21,7 +21,7 @@
  * symmetry class indicated below; others fall back to the source artwork.
  */
 
-export type Layer = 'ground' | 'mid' | 'top';
+export type Layer = 'ground' | 'mid' | 'top' | 'crown';
 export type Symmetry = 'X' | 'I' | 'L';
 
 export type SocketTag =
@@ -50,22 +50,17 @@ export type BaseTileId =
   | 'dais-stepped'
   | 'empty-mid'
   | 'cube-plain'
-  | 'cube-arch'
   | 'temple-balcony'
-  | 'corner-inner'
-  | 'corner-outer'
   | 'walls-L-tall'
   | 'stairs-high'
   | 'stairs-low'
   | 'ramp'
-  | 'portal-arch'
   | 'column'
   | 'empty-top'
-  | 'tower-crenel'
-  | 'wall-curve'
   | 'top-cube-coral'
   | 'top-cube-lavender'
-  | 'top-arch-coral';
+  | 'empty-crown'
+  | 'crown-tower';
 
 export interface BaseTile {
   id: BaseTileId;
@@ -96,6 +91,9 @@ export interface BaseTile {
   walkable?: boolean;
   /** True if this mid-layer tile creates a walkable surface on top (i.e. roof). */
   hasRoof?: boolean;
+  /** True if this tile is a true block/cube body that can support stacking on
+   *  its roof. False (default) for walls, corners, arches, decorative pieces. */
+  isBlock?: boolean;
   /** Tile is a transition between layers (stairs, ramp). 'low'→'high' direction faces. */
   stairs?: { lowDir: 0 | 1 | 2 | 3 } | null;
   /** Tile is a horizontal portal connecting mid-layer surfaces through it. */
@@ -184,20 +182,7 @@ export const BASE_TILES: readonly BaseTile[] = [
     weight: 1.4,
     shade: 'coral',
     hasRoof: true,
-  },
-  {
-    id: 'cube-arch',
-    layer: 'mid',
-    // Two-source pair (4 + 6) gives us rotations 0 and 2 from the sheet.
-    symmetry: 'I',
-    sourceIndex: 4,
-    pairedSourceIndex: 6,
-    // 'open' on the arch faces accepts any shade so people can walk through.
-    sockets: ['open', 'wall-coral', 'open', 'wall-coral'],
-    weight: 0.7,
-    shade: 'coral',
-    portal: true,
-    hasRoof: true,
+    isBlock: true,
   },
   {
     id: 'temple-balcony',
@@ -210,27 +195,7 @@ export const BASE_TILES: readonly BaseTile[] = [
     weight: 0.45,
     shade: 'lavender',
     hasRoof: true,
-  },
-  {
-    id: 'corner-inner',
-    layer: 'mid',
-    // Only one source facing exists — keep a single rotation to avoid sheared art.
-    symmetry: 'X',
-    sourceIndex: 8,
-    sockets: ['wall-coral', 'wall-coral', 'air', 'air'],
-    weight: 0.6,
-    shade: 'coral',
-    hasRoof: true,
-  },
-  {
-    id: 'corner-outer',
-    layer: 'mid',
-    symmetry: 'X',
-    sourceIndex: 9,
-    sockets: ['air', 'air', 'wall-coral', 'wall-coral'],
-    weight: 0.6,
-    shade: 'coral',
-    hasRoof: true,
+    isBlock: true,
   },
   {
     id: 'walls-L-tall',
@@ -273,19 +238,6 @@ export const BASE_TILES: readonly BaseTile[] = [
     stairs: { lowDir: 2 },
   },
   {
-    id: 'portal-arch',
-    layer: 'mid',
-    symmetry: 'X',
-    sourceIndex: 14,
-    // Sage portal — walls on E/W are sage; openings on N/S are universal.
-    sockets: ['open', 'wall-sage', 'open', 'wall-sage'],
-    weight: 0.55,
-    shade: 'sage',
-    // Source art reads visually larger than other 1-tile sprites; trim down.
-    renderScale: 0.85,
-    portal: true,
-  },
-  {
     id: 'column',
     layer: 'mid',
     symmetry: 'X',
@@ -295,7 +247,7 @@ export const BASE_TILES: readonly BaseTile[] = [
     weight: 0.08,
   },
 
-  // ─── TOP LAYER ──────────────────────────────────────────────────────────
+  // ─── TOP LAYER (stackable structures over isBlock mid cells) ───────────
   {
     id: 'empty-top',
     layer: 'top',
@@ -304,28 +256,10 @@ export const BASE_TILES: readonly BaseTile[] = [
     sockets: ['none', 'none', 'none', 'none'],
     weight: 9,
   },
-  {
-    id: 'tower-crenel',
-    layer: 'top',
-    symmetry: 'X',
-    sourceIndex: 18,
-    sockets: ['crenel', 'crenel', 'crenel', 'crenel'],
-    weight: 0.5,
-    shade: 'lavender',
-  },
-  {
-    id: 'wall-curve',
-    layer: 'top',
-    symmetry: 'X',
-    sourceIndex: 21,
-    sockets: ['wall-coral', 'open', 'wall-coral', 'open'],
-    weight: 0.3,
-    shade: 'coral',
-  },
   // Stackable cubes — reuse the mid-layer cube sprites so a coral cube on top
-  // of a coral cube reads as a two-storey block. The shade-coupled top bias
-  // already enforces matching shades (or pairs with empty-top above non-roof
-  // mid cells), so these tiles only appear above another cube of their shade.
+  // of a coral cube reads as a two-storey block. Only spawn over isBlock mid
+  // cells (forced via top-pass forceCollapse). Tagged isBlock so the crown
+  // layer (towers) can stack on them in turn.
   {
     id: 'top-cube-coral',
     layer: 'top',
@@ -335,6 +269,7 @@ export const BASE_TILES: readonly BaseTile[] = [
     weight: 1.6,
     shade: 'coral',
     hasRoof: true,
+    isBlock: true,
   },
   {
     id: 'top-cube-lavender',
@@ -346,17 +281,28 @@ export const BASE_TILES: readonly BaseTile[] = [
     weight: 0.5,
     shade: 'lavender',
     hasRoof: true,
+    isBlock: true,
+  },
+  // Arch is a doorway — disabled per user request (no doorways on the second
+  // level). Keep the slot blank.
+
+  // ─── CROWN LAYER (towers, only over an isBlock top cell) ───────────────
+  {
+    id: 'empty-crown',
+    layer: 'crown',
+    symmetry: 'X',
+    sourceIndex: null,
+    sockets: ['none', 'none', 'none', 'none'],
+    weight: 9,
   },
   {
-    id: 'top-arch-coral',
-    layer: 'top',
-    symmetry: 'I',
-    sourceIndex: 4,
-    pairedSourceIndex: 6,
-    sockets: ['open', 'wall-coral', 'open', 'wall-coral'],
-    weight: 0.4,
-    shade: 'coral',
-    hasRoof: true,
+    id: 'crown-tower',
+    layer: 'crown',
+    symmetry: 'X',
+    sourceIndex: 18,
+    sockets: ['crenel', 'crenel', 'crenel', 'crenel'],
+    weight: 1.0,
+    shade: 'lavender',
   },
 ];
 
@@ -486,25 +432,31 @@ export interface LayerIndices {
   ground: number[];
   mid: number[];
   top: number[];
+  crown: number[];
   emptyGround: number;
   emptyMid: number;
   emptyTop: number;
+  emptyCrown: number;
 }
 
 export function buildLayerIndices(catalog: readonly TileVariant[]): LayerIndices {
   const ground: number[] = [];
   const mid: number[] = [];
   const top: number[] = [];
+  const crown: number[] = [];
   let emptyGround = -1;
   let emptyMid = -1;
   let emptyTop = -1;
+  let emptyCrown = -1;
   for (const v of catalog) {
     if (v.layer === 'ground') ground.push(v.index);
     else if (v.layer === 'mid') mid.push(v.index);
-    else top.push(v.index);
+    else if (v.layer === 'top') top.push(v.index);
+    else crown.push(v.index);
     if (v.baseId === 'empty-ground' && v.rotation === 0) emptyGround = v.index;
     if (v.baseId === 'empty-mid' && v.rotation === 0) emptyMid = v.index;
     if (v.baseId === 'empty-top' && v.rotation === 0) emptyTop = v.index;
+    if (v.baseId === 'empty-crown' && v.rotation === 0) emptyCrown = v.index;
   }
-  return { ground, mid, top, emptyGround, emptyMid, emptyTop };
+  return { ground, mid, top, crown, emptyGround, emptyMid, emptyTop, emptyCrown };
 }

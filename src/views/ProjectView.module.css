@@ -24,12 +24,6 @@
   justify-content: center;
 }
 
-@media (min-width: 1024px) {
-  .menuBtn {
-    display: none;
-  }
-}
-
 .breadcrumb {
   display: flex;
   align-items: center;

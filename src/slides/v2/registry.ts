@@ -10,7 +10,7 @@ import type { SlideRegistryEntry } from '../types';
  */
 export const presentationV2Registry: SlideRegistryEntry[] = [
   {
-    meta: { id: 'v2-title', title: 'Math, Sacred Geometry, and Art with Code' },
+    meta: { id: 'v2-title', title: 'Visualizing Math, Sacred Geometry, and Art with Code' },
     load: () => import('./content/01-title.mdx'),
   },
   {

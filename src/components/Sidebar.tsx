@@ -74,12 +74,12 @@ export function Sidebar() {
               </span>
             </button>
 
+            {projectsNavExpanded && (
             <ul
               id="sidebar-projects"
               className={styles.groupList}
               role="list"
               data-expanded={projectsNavExpanded}
-              hidden={!projectsNavExpanded}
             >
               {projectRegistry.map(({ meta }) => {
                 const href = `/projects/${meta.id}`;
@@ -104,6 +104,7 @@ export function Sidebar() {
                 );
               })}
             </ul>
+            )}
           </li>
         </ul>
       </nav>

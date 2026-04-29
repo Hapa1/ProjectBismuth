@@ -31,7 +31,14 @@ const DEFAULT_CONTROLS: Controls = {
   autoRestart: true,
 };
 
-type Phase = 'loading' | 'collapsing-ground' | 'collapsing-mid' | 'collapsing-top' | 'walking' | 'failed';
+type Phase =
+  | 'loading'
+  | 'collapsing-ground'
+  | 'collapsing-mid'
+  | 'collapsing-top'
+  | 'collapsing-crown'
+  | 'walking'
+  | 'failed';
 
 interface SceneState {
   signature: string;
@@ -40,9 +47,11 @@ interface SceneState {
   ground: Wfc2D;
   mid: Wfc2D | null;
   top: Wfc2D | null;
+  crown: Wfc2D | null;
   collapsedGround: number[] | null;
   collapsedMid: number[] | null;
   collapsedTop: number[] | null;
+  collapsedCrown: number[] | null;
   phase: Phase;
   tileW: number;
   tileH: number;
@@ -100,7 +109,7 @@ function buildCellBias(
           m.set(idx, isEdge ? 0.2 : 1.4);
         } else if (
           v.baseId === 'temple-balcony' ||
-          v.baseId === 'tower-crenel'
+          v.baseId === 'crown-tower'
         ) {
           m.set(idx, isEdge ? 0.4 : 1.5);
         }
@@ -629,9 +638,11 @@ function createScene(
     ground,
     mid: null,
     top: null,
+    crown: null,
     collapsedGround: null,
     collapsedMid: null,
     collapsedTop: null,
+    collapsedCrown: null,
     phase: 'collapsing-ground',
     tileW: geom.tileW,
     tileH: geom.tileH,
@@ -706,17 +717,33 @@ function advanceScene(
       const baseTopBias = buildCellBias(W, W, catalog, layerIdx.top, layerIdx.emptyTop);
       // Shade-coupled top bias: a top tile may sit on a mid cell only if their
       // shades match (or top is shade-neutral). Forbid mismatches by zero weight.
+      // Additionally, when the mid cell is a roofed cube, strongly favour a
+      // stacked cube of the matching shade so the scene actually grows
+      // vertically (otherwise empty-top's high base weight wins ~80% of rolls).
+      const STACK_IDS = new Set<string>(['top-cube-coral', 'top-cube-lavender']);
       const topBias: Map<number, number>[] = [];
       for (let y = 0; y < W; y++) {
         for (let x = 0; x < W; x++) {
           const m = new Map(baseTopBias[x + y * W]);
           const midVariant = catalog[scene.collapsedMid[x + y * W]];
           const midShade = midVariant.base.shade ?? 'neutral';
+          const midIsBlock = midVariant.base.isBlock === true;
           for (const idx of layerIdx.top) {
-            if (idx === layerIdx.emptyTop) continue;
-            const topShade = catalog[idx].base.shade ?? 'neutral';
+            if (idx === layerIdx.emptyTop) {
+              // On a true block, sharply down-weight empty-top so a stack
+              // becomes the dominant outcome.
+              if (midIsBlock) m.set(idx, 0.4);
+              continue;
+            }
+            const topVariant = catalog[idx];
+            const topShade = topVariant.base.shade ?? 'neutral';
             if (topShade !== 'neutral' && midShade !== 'neutral' && topShade !== midShade) {
               m.set(idx, 0);
+              continue;
+            }
+            // Stack-cube tiles only over isBlock mid cells.
+            if (STACK_IDS.has(topVariant.baseId)) {
+              m.set(idx, midIsBlock ? 6 : 0);
             }
           }
           topBias.push(m);
@@ -729,12 +756,14 @@ function advanceScene(
         layerIndices: layerIdx.top,
         cellBias: topBias,
       });
-      // Force-empty top above mid cells without a roof.
+      // Force-empty top above any mid that is NOT a true block (cube-plain or
+      // temple-balcony). Walls, corners, arches, columns, stairs etc. cannot
+      // support stacked structures — only true blocks can.
       for (let y = 0; y < W; y++) {
         for (let x = 0; x < W; x++) {
           const mIdx = scene.collapsedMid[x + y * W];
           const mv = catalog[mIdx];
-          if (mv.base.hasRoof !== true) {
+          if (mv.base.isBlock !== true) {
             scene.top.forceCollapse(x, y, layerIdx.emptyTop);
           }
         }
@@ -755,6 +784,73 @@ function advanceScene(
       return;
     }
     if (scene.collapsedGround && scene.collapsedMid && scene.collapsedTop) {
+      // ─── CROWN PASS ──────────────────────────────────────────────────
+      // Towers (crown-tower) only spawn over an isBlock top cell — i.e. on
+      // top of a stacked cube (top-cube-coral or top-cube-lavender). Above
+      // anything else, force empty-crown.
+      const W2 = scene.top.width;
+      const crownBias: Map<number, number>[] = [];
+      for (let y = 0; y < W2; y++) {
+        for (let x = 0; x < W2; x++) {
+          const m = new Map<number, number>();
+          const tIdx = scene.collapsedTop[x + y * W2];
+          const tv = catalog[tIdx];
+          const topShade = tv.base.shade ?? 'neutral';
+          const onStack = tv.base.isBlock === true;
+          for (const idx of layerIdx.crown) {
+            if (idx === layerIdx.emptyCrown) {
+              // Sharp downweight when on a stack so the tower wins.
+              m.set(idx, onStack ? 0.6 : 9);
+              continue;
+            }
+            if (!onStack) {
+              m.set(idx, 0);
+              continue;
+            }
+            const cShade = catalog[idx].base.shade ?? 'neutral';
+            if (
+              cShade !== 'neutral' &&
+              topShade !== 'neutral' &&
+              cShade !== topShade
+            ) {
+              m.set(idx, 0);
+              continue;
+            }
+            m.set(idx, 4);
+          }
+          crownBias.push(m);
+        }
+      }
+      scene.crown = new Wfc2D({
+        width: W2,
+        depth: W2,
+        catalog,
+        layerIndices: layerIdx.crown,
+        cellBias: crownBias,
+      });
+      for (let y = 0; y < W2; y++) {
+        for (let x = 0; x < W2; x++) {
+          const tIdx = scene.collapsedTop[x + y * W2];
+          const tv = catalog[tIdx];
+          if (tv.base.isBlock !== true) {
+            scene.crown.forceCollapse(x, y, layerIdx.emptyCrown);
+          }
+        }
+      }
+      scene.phase = 'collapsing-crown';
+    }
+  }
+
+  if (scene.phase === 'collapsing-crown' && scene.crown) {
+    runWfc(scene.crown, stepsPerFrame);
+    if (scene.crown.failed) {
+      scene.collapsedCrown = new Array(scene.crown.cells.length).fill(layerIdx.emptyCrown);
+    } else if (scene.crown.done) {
+      scene.collapsedCrown = snapshotCollapsed(scene.crown);
+    } else {
+      return;
+    }
+    if (scene.collapsedCrown) {
       scene.phase = 'walking';
       scene.doneTime = performance.now();
     }
@@ -814,10 +910,10 @@ function worldToScreen(
   level: number,
 ): { sx: number; sy: number } {
   const sx = scene.originX + (x - y) * (scene.tileW / 2);
-  // Bbox-bottom anchoring already places mid features sitting on the floor,
-  // so level 1 needs no extra lift. Level 2 (top decorations) lifts by one
-  // cube height.
-  const lift = level >= 2 ? scene.layerHeight : 0;
+  // Level 0 (ground) and 1 (mid) share the same diamond — bbox-cell anchoring
+  // already places mid features sitting on the floor. Each layer above lifts
+  // by one cube body height (= layerHeight).
+  const lift = Math.max(0, level - 1) * scene.layerHeight;
   const sy = scene.originY + (x + y) * (scene.tileH / 2) - lift;
   return { sx, sy };
 }
@@ -838,6 +934,7 @@ function renderScene(
     drawCellLayer(p, scene, cache, catalog, x, y, 0);
     drawCellLayer(p, scene, cache, catalog, x, y, 1);
     drawCellLayer(p, scene, cache, catalog, x, y, 2);
+    drawCellLayer(p, scene, cache, catalog, x, y, 3);
   }
 }
 
@@ -849,7 +946,7 @@ function drawCellLayer(
   catalog: readonly TileVariant[],
   x: number,
   y: number,
-  layerIdx: 0 | 1 | 2,
+  layerIdx: 0 | 1 | 2 | 3,
 ): void {
   const W = scene.ground.width;
   const i = x + y * W;
@@ -868,6 +965,11 @@ function drawCellLayer(
     variantIndex = scene.collapsedTop[i];
   } else if (layerIdx === 2 && scene.top) {
     const c = scene.top.cells[i];
+    if (c.collapsed) variantIndex = c.options[0];
+  } else if (layerIdx === 3 && scene.collapsedCrown) {
+    variantIndex = scene.collapsedCrown[i];
+  } else if (layerIdx === 3 && scene.crown) {
+    const c = scene.crown.cells[i];
     if (c.collapsed) variantIndex = c.options[0];
   }
   if (variantIndex < 0) return;

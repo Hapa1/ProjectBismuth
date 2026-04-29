@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useId } from 'react';
 import styles from './Carousel.module.css';
 
 // ---------------------------------------------------------------------------
@@ -58,6 +58,8 @@ export function Carousel({
   const trackRef = useRef<HTMLDivElement | null>(null);
   const [canPrev, setCanPrev] = useState(false);
   const [canNext, setCanNext] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const trackId = useId();
 
   const updateButtons = useCallback(() => {
     const el = trackRef.current;
@@ -108,38 +110,51 @@ export function Carousel({
     : undefined;
 
   return (
-    <div className={styles.wrap} style={wrapStyle}>
-      <div className={styles.shell}>
+    <div className={`${styles.wrap} ${collapsed ? styles.wrapCollapsed : ''}`} style={wrapStyle}>
+      <div className={`${styles.shell} ${collapsed ? styles.shellCollapsed : ''}`}>
         <div className={styles.headerRow}>
           <span className={styles.eyebrow}>{eyebrow}</span>
-          <div className={styles.controls} aria-hidden="false">
+          <div className={styles.headerActions}>
             <button
               type="button"
-              className={styles.navButton}
-              onClick={() => scrollByCard(-1)}
-              disabled={!canPrev}
-              aria-label="Previous"
+              className={styles.toggleButton}
+              onClick={() => setCollapsed((v) => !v)}
+              aria-expanded={!collapsed}
+              aria-controls={trackId}
+              aria-label={collapsed ? 'Show artists' : 'Hide artists'}
             >
-              ←
+              {collapsed ? '▲ Show' : '▼ Hide'}
             </button>
-            <button
-              type="button"
-              className={styles.navButton}
-              onClick={() => scrollByCard(1)}
-              disabled={!canNext}
-              aria-label="Next"
-            >
-              →
-            </button>
+            <div className={`${styles.controls} ${collapsed ? styles.controlsHidden : ''}`} aria-hidden="false">
+              <button
+                type="button"
+                className={styles.navButton}
+                onClick={() => scrollByCard(-1)}
+                disabled={!canPrev}
+                aria-label="Previous"
+              >
+                ←
+              </button>
+              <button
+                type="button"
+                className={styles.navButton}
+                onClick={() => scrollByCard(1)}
+                disabled={!canNext}
+                aria-label="Next"
+              >
+                →
+              </button>
+            </div>
           </div>
         </div>
 
         <div
+          id={trackId}
           ref={trackRef}
-          className={styles.track}
+          className={`${styles.track} ${collapsed ? styles.trackCollapsed : ''}`}
           role="region"
           aria-label={eyebrow}
-          tabIndex={0}
+          tabIndex={collapsed ? -1 : 0}
           onKeyDown={onKeyDown}
         >
           {items.map((item) => (

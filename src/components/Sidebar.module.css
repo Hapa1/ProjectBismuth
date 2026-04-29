@@ -21,29 +21,12 @@
   transform: translateX(0);
 }
 
-/* Desktop: always visible rail */
-@media (min-width: 1024px) {
-  .sidebar {
-    position: sticky;
-    top: 0;
-    transform: none;
-    transition: none;
-    flex-shrink: 0;
-  }
-}
-
-/* Backdrop (mobile only) */
+/* Backdrop (shown on all viewports when sidebar is open) */
 .backdrop {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.6);
   z-index: 199;
-}
-
-@media (min-width: 1024px) {
-  .backdrop {
-    display: none;
-  }
 }
 
 /* Header / logo */

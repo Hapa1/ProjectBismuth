@@ -11,6 +11,7 @@ import { SymbolWall } from '../components/slides/SymbolWall';
 import { SymbolExhibits } from '../components/slides/exhibits/SymbolExhibits';
 import { ArtistCarousel } from '../components/slides/ArtistCarousel';
 import { SlideReveal } from '../components/slides/SlideReveal';
+import { ProjectLinks } from '../components/slides/ProjectLinks';
 
 /**
  * Components automatically available inside any slide MDX file. Authors can
@@ -42,4 +43,5 @@ export const slideMdxComponents: MDXComponents = {
   Compare: SlideCompare,
   Annotation: SlideAnnotation,
   ArtistCarousel,
+  ProjectLinks,
 };

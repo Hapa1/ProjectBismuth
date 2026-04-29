@@ -43,12 +43,6 @@
   justify-content: center;
 }
 
-@media (min-width: 1024px) {
-  .menuBtn {
-    display: none;
-  }
-}
-
 /* Top progress bar — fills as you advance through the deck. */
 .progress {
   position: absolute;

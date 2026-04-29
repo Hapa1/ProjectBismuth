@@ -97,10 +97,35 @@
 .thumb {
   width: 100%;
   aspect-ratio: 1;
-  object-fit: cover;
   border-radius: 0.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #161320 0%, #0d0b14 100%);
+  border: 1px solid rgba(167, 139, 250, 0.15);
+  color: var(--color-accent, #a78bfa);
+  padding: 0.4rem;
+  box-sizing: border-box;
+  transition: color 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.thumbIcon {
+  width: 100%;
+  height: 100%;
   display: block;
-  background: #111;
+}
+
+.railItemActive .thumb {
+  color: #d4c5ff;
+  border-color: rgba(167, 139, 250, 0.55);
+  background: linear-gradient(135deg, #1f1830 0%, #120e1c 100%);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .railItem:hover .thumb {
+    color: #c4b3ff;
+    border-color: rgba(167, 139, 250, 0.35);
+  }
 }
 
 .thumbLabel {

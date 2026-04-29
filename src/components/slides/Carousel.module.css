@@ -3,14 +3,11 @@
  *
  * Layout strategy
  * ---------------
- * .wrap   absolute layer pinned to bottom-left of the slide.
- *         On mobile it spans full width.
- *         On >= 768 px it respects `--carousel-right-inset` so it never
- *         slides under a project's right-rail settings panel.
- *         It also clears the slide-indicator dots on mobile with extra
- *         bottom padding.
+ * .wrap   absolute layer. `top: 42%` prevents it from rising above the slide's
+ *         midpoint so it never overlaps the title overlay at the top.
+ *         On >= 768 px it respects `--carousel-right-inset`.
  *
- * .shell  the visible glass pill inside .wrap.
+ * .shell  liquid-glass pill that fills .wrap height.
  */
 
 /* --------------------------------------------------------------------------
@@ -19,28 +16,32 @@
 
 .wrap {
   position: absolute;
+  top: 42%;
   left: 0;
   right: 0;
   bottom: 0;
   z-index: 3;
-  /* Extra bottom clearance for the slide-indicator dots on mobile (fixed,
-     z-index 50, ~44 px tall, offset 0.75 rem from bottom). */
   padding: 0.5rem 0.5rem calc(44px + 1.25rem);
   pointer-events: none;
+  overflow: hidden;
 }
 
-/* On tablet/desktop the slide-indicator dots move to the right rail so we
-   restore normal bottom padding and instead offset from the right to avoid
-   any project panel sitting on the right side of the canvas. */
 @media (min-width: 768px) {
   .wrap {
     right: var(--carousel-right-inset, 0px);
     padding: clamp(0.75rem, 2vw, 1.25rem);
+    top: 38%;
   }
 }
 
 /* --------------------------------------------------------------------------
- * Glass shell
+ * Liquid glass shell
+ *
+ * Three layered backgrounds (no pseudo-elements — they break inside a
+ * backdrop-filter stacking context):
+ *   1. Diagonal specular sweep (top-left bright hit)
+ *   2. Prismatic violet → blue refraction tint
+ *   3. Semi-transparent dark base fill
  * -------------------------------------------------------------------------- */
 
 .shell {
@@ -49,14 +50,62 @@
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.75rem clamp(0.5rem, 2vw, 1rem) 0.75rem;
-  border-radius: 14px;
-  background: rgba(10, 10, 10, 0.62);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+  border-radius: 20px;
+
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.13) 0%,
+      rgba(255, 255, 255, 0.04) 35%,
+      transparent 65%
+    ),
+    linear-gradient(
+      to bottom right,
+      rgba(167, 139, 250, 0.07) 0%,
+      rgba(96, 165, 250, 0.04) 100%
+    ),
+    rgba(14, 14, 20, 0.28);
+
+  backdrop-filter: blur(28px) saturate(180%) brightness(1.04);
+  -webkit-backdrop-filter: blur(28px) saturate(180%) brightness(1.04);
+
+  border: 1px solid rgba(255, 255, 255, 0.16);
+
+  box-shadow:
+    0 24px 64px rgba(0, 0, 0, 0.5),
+    0 6px 20px rgba(0, 0, 0, 0.3),
+    /* top-edge specular — the key "glass" line */
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.3),
+    inset 1px 0 0 rgba(255, 255, 255, 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.22),
+    0 0 0 0.5px rgba(167, 139, 250, 0.14);
+
   pointer-events: auto;
   color: var(--color-text);
+
+  /* Fill wrap height so track can flex-grow */
+  height: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* Collapsed: shell shrinks to just the header bar */
+.shellCollapsed {
+  height: auto;
+  overflow: visible;
+}
+
+/* When collapsed the wrap doesn't need to fill from top */
+.wrapCollapsed {
+  top: auto;
+  bottom: 0;
+}
+
+@media (min-width: 768px) {
+  .wrapCollapsed {
+    top: auto;
+    bottom: 0;
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -64,11 +113,18 @@
  * -------------------------------------------------------------------------- */
 
 .headerRow {
+  flex-shrink: 0;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0 clamp(0.25rem, 1vw, 0.5rem);
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
 }
 
 .eyebrow {
@@ -83,6 +139,10 @@
  * Navigation buttons — hidden on mobile (swipe), shown on pointer devices
  * -------------------------------------------------------------------------- */
 
+.controlsHidden {
+  display: none;
+}
+
 .controls {
   display: none;
   gap: 0.4rem;
@@ -94,33 +154,51 @@
   }
 }
 
+
 .navButton {
   width: 44px;
   height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, transparent 60%),
+    rgba(255, 255, 255, 0.06);
+
+  border: 1px solid rgba(255, 255, 255, 0.18);
+
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.15),
+    0 2px 8px rgba(0, 0, 0, 0.3);
+
   color: var(--color-text);
   font-family: var(--font-mono, ui-monospace, monospace);
   font-size: 1rem;
   cursor: pointer;
   transition:
-    background-color 120ms ease,
-    border-color 120ms ease;
+    background 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .navButton:disabled {
-  opacity: 0.35;
+  opacity: 0.3;
   cursor: not-allowed;
 }
 
 @media (hover: hover) and (pointer: fine) {
   .navButton:not(:disabled):hover {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.18);
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0%, transparent 60%),
+      rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.28);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.3),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.1),
+      0 4px 14px rgba(0, 0, 0, 0.35);
   }
 }
 
@@ -129,11 +207,19 @@
   outline-offset: 2px;
 }
 
+/* Collapsed track: hidden but kept in DOM */
+.trackCollapsed {
+  display: none;
+}
+
 /* --------------------------------------------------------------------------
  * Scroll track
  * -------------------------------------------------------------------------- */
 
 .track {
+  flex: 1;
+  min-height: 0;
+
   display: flex;
   gap: 0.75rem;
   overflow-x: auto;
@@ -141,13 +227,13 @@
   scroll-snap-type: x mandatory;
   scroll-behavior: smooth;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
   padding: 0.25rem clamp(0.25rem, 1vw, 0.5rem) 0.5rem;
   -webkit-overflow-scrolling: touch;
 }
 
 .track::-webkit-scrollbar {
-  height: 6px;
+  height: 5px;
 }
 
 .track::-webkit-scrollbar-track {
@@ -155,8 +241,13 @@
 }
 
 .track::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.15);
   border-radius: 3px;
+}
+
+/* Collapsed track: visually hidden but kept in DOM for a11y */
+.trackCollapsed {
+  display: none;
 }
 
 /* --------------------------------------------------------------------------
@@ -166,28 +257,37 @@
 .card {
   flex: 0 0 auto;
   scroll-snap-align: start;
-  /* On narrow phones a single card takes up most of the visible width. */
-  width: clamp(220px, 70vw, 260px);
+  width: clamp(220px, 70vw, 250px);
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
   padding: 0.75rem;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0%, transparent 50%),
+    rgba(255, 255, 255, 0.04);
+
+  border: 1px solid rgba(255, 255, 255, 0.13);
+
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1),
+    0 4px 16px rgba(0, 0, 0, 0.2);
+
   color: var(--color-text);
   text-align: left;
 }
 
 @media (min-width: 480px) {
   .card {
-    width: clamp(240px, 60vw, 270px);
+    width: clamp(240px, 60vw, 260px);
   }
 }
 
 @media (min-width: 768px) {
   .card {
-    width: 280px;
+    width: 260px;
   }
 }
 
@@ -199,10 +299,10 @@
   position: relative;
   aspect-ratio: 1 / 1;
   width: 100%;
-  border-radius: 8px;
+  border-radius: 10px;
   overflow: hidden;
-  background: #111;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .media img {
@@ -221,26 +321,26 @@
  * -------------------------------------------------------------------------- */
 
 .cardEmbed {
-  width: clamp(320px, 90vw, 360px);
+  width: clamp(300px, 88vw, 340px);
 }
 
 @media (min-width: 480px) {
   .cardEmbed {
-    width: clamp(330px, 80vw, 360px);
+    width: clamp(310px, 78vw, 340px);
   }
 }
 
 @media (min-width: 768px) {
   .cardEmbed {
-    width: 360px;
+    width: 340px;
   }
 }
 
 .mediaEmbed {
   aspect-ratio: auto;
-  height: 480px;
+  height: 300px;
   background: #fff;
-  border-color: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
 .embed {
@@ -266,7 +366,7 @@
 
 .cardTitle {
   font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 600;
   letter-spacing: 0.01em;
   margin: 0;
@@ -275,17 +375,17 @@
 
 .subtitle {
   font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: var(--color-text-muted, #9a9a9a);
 }
 
 .description {
   margin: 0;
-  font-size: clamp(0.78rem, 0.74rem + 0.2vw, 0.85rem);
+  font-size: clamp(0.75rem, 0.72rem + 0.15vw, 0.82rem);
   line-height: 1.45;
   color: var(--color-text);
   display: -webkit-box;
-  -webkit-line-clamp: 4;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -301,23 +401,40 @@
   justify-content: center;
   min-height: 44px;
   padding: 0.5rem 0.75rem;
-  border-radius: 8px;
-  background: rgba(167, 139, 250, 0.12);
-  border: 1px solid rgba(167, 139, 250, 0.35);
+  border-radius: 10px;
+
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, transparent 55%),
+    rgba(167, 139, 250, 0.1);
+
+  border: 1px solid rgba(167, 139, 250, 0.32);
+
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.1),
+    0 2px 8px rgba(0, 0, 0, 0.2);
+
   color: var(--color-text);
   font-family: var(--font-mono, ui-monospace, monospace);
   font-size: 0.78rem;
   letter-spacing: 0.04em;
   text-decoration: none;
   transition:
-    background-color 120ms ease,
-    border-color 120ms ease;
+    background 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease;
 }
 
 @media (hover: hover) and (pointer: fine) {
   .cta:hover {
-    background: rgba(167, 139, 250, 0.22);
-    border-color: rgba(167, 139, 250, 0.55);
+    background:
+      linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, transparent 55%),
+      rgba(167, 139, 250, 0.18);
+    border-color: rgba(167, 139, 250, 0.5);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.25),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.08),
+      0 4px 14px rgba(167, 139, 250, 0.2);
   }
 }
 
